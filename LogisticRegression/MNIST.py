@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 from unittest import makeSuite, TestCase, main
 
@@ -11,7 +11,7 @@ from keras.layers import Dense, Activation
 from keras.datasets import mnist
 from keras.utils import np_utils
 
-from performance.metrics import Metrics
+#from performance.metrics import Metrics
 
 INPUT_DATA = "/home/ec2-user/input_data/"
 
@@ -51,11 +51,11 @@ class MNIST:
                     verbose=1, validation_data=(X_test, y_test))
     score = self.__model.evaluate(X_test, y_test, verbose=0)
 
-    metric = Metrics()
-    y_hat_test = self.__model.predict_proba(X_test)
-    for i in np.arange(0, self.__classes):
-      print "i= %d; AUROC= %.5lf" % (i, 1-metric.AUROC(y_test[:,i], y_hat_test[:,i]))
-    del metric
+    #metric = Metrics()
+    #y_hat_test = self.__model.predict_proba(X_test)
+    #for i in np.arange(0, self.__classes):
+    #  print("i= %d; AUROC= %.5lf" % (i, 1-metric.AUROC(y_test[:,i], y_hat_test[:,i])))
+    #del metric
 
   def save(self):
 
@@ -70,7 +70,6 @@ class MNIST:
 
 
 class TestMNIST(TestCase):                                                                                                         
-    
   def setUp(self):
 
     self.__mnist = MNIST(128, 10, 20, 784)
@@ -82,7 +81,7 @@ class TestMNIST(TestCase):
   def testALogisticRegreesion(self): 
 
     (X_train, y_train), (X_test, y_test) = mnist.load_data()
-    print y_train[10:]
+    print(y_train[10:])
 
     input_dim = 784
     nb_classes = 10
@@ -97,11 +96,12 @@ class TestMNIST(TestCase):
     # convert class vectors to binary class matrices
     Y_train = np_utils.to_categorical(y_train, nb_classes)
     Y_test = np_utils.to_categorical(y_test, nb_classes)
-    print Y_train.shape
-    print Y_train
+    print(Y_train.shape)
+    print(Y_train)
 
     self.__mnist.fit(X_train, Y_train, X_test, Y_test)
-    self.__mnist.save()
+    #self.__mnist.save()
+
 
 def suite():
   suite = makeSuite(TestMNIST, 'test')
