@@ -10,10 +10,21 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation
 from keras.datasets import mnist
 from keras.utils import np_utils
+import keras.backend as K
 
 #from performance.metrics import Metrics
 
 INPUT_DATA = "/home/ec2-user/input_data/"
+
+def custom_loss(layer):
+  """
+    function closure
+  """
+
+  def loss(y_true, y_pred):
+    return K.mean(K.square(y_pred - y_true) K.square(layer), axis=-1)
+
+  return loss
 
 
 class MNIST:
@@ -45,7 +56,8 @@ class MNIST:
     self.buildModel()
     self.__model.summary()
 
-    self.__model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+    #self.__model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+    self.__model.compile(optimizer='sgd', loss=custom_loss(), metrics=['categorical_accuracy'])
     history = self.__model.fit(X, y,
                     batch_size=self.__batch, nb_epoch=self.__epochs,
                     verbose=1, validation_data=(X_test, y_test))
