@@ -8,16 +8,20 @@ import pandas as pd
 from datetime import datetime
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 
 from keras.models import Sequential
-from keras.layers import Dense, Activation
+from keras.layers import Dense, Activation, Dropout
 from keras.datasets import mnist
 from keras.utils import np_utils
 import keras.backend as K
 
 #from performance.metrics import Metrics
 
-DATA_DIR = "/home/laptop/Documents/data/aviation/OTD/"
+#DATA_DIR = "/home/laptop/Documents/data/aviation/OTD/"
+DATA_DIR = "/Users/UCRP556/code/networks/data/NASA/Challenge_Data/"
+
+
 
 def custom_loss(events):
   """
@@ -32,6 +36,7 @@ def custom_loss(events):
     return 0
 
   return loss
+
 
 
 class LongitudinalClassification:
@@ -56,7 +61,57 @@ class LongitudinalClassification:
   def buildModel(self):
 
     self.__model = Sequential()
-    self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='softmax'))
+    #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='softmax'))
+    self.__model.add(Dense(64, input_dim=self.__input_dim, activation='relu'))
+    self.__model.add(Dropout(.5))
+    self.__model.add(Dense(28, activation='relu'))
+    self.__model.add(Dropout(.5))
+    self.__model.add(Dense(2, activation='sigmoid'))
+    #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='sigmoid'))
+
+  def load_nasa_challenge_data(self, train_file, test_file, events, train_gap=20):
+
+    columns = ['device_id', 'cycles', 'setting1', 'setting2', 'setting3']
+    sensors = ['sensor'+str(i+1) for i in np.arange(0, 23)]
+    columns += sensors
+
+    df_train = pd.read_csv(train_file, sep=' ', header=None)
+    df_train.columns = columns
+    df_train.dropna(axis=1, inplace=True)
+    df_train['rank'] = df_train.groupby('device_id')['cycles'].rank(ascending=False)
+    df_train['Y'] = np.zeros(df_train.shape[0])
+    df_train.loc[df_train['rank'] <= train_gap, ['Y']] = 1
+    df_train['RUL'] = np.zeros(df_train.shape[0])
+
+    df_test = pd.read_csv(test_file, sep=' ', header=None)
+    df_test.columns = columns
+    df_test.dropna(axis=1, inplace=True)
+    df_test['rank'] = df_test.groupby('device_id')['cycles'].rank(ascending=False)
+    df_test['Y'] = np.zeros(df_test.shape[0])
+    df_test.loc[df_test['rank'] <= train_gap, ['Y']] = 1
+    df_test['RUL'] = np.zeros(df_test.shape[0])
+
+    for dev_id in df_train['device_id'].unique():
+      df_train.loc[df_train['device_id'] == dev_id, ['RUL']] = \
+            df_train['cycles'].max() - df_train['cycles']
+
+    for dev_id in df_test['device_id'].unique():
+      df_test.loc[df_test['device_id'] == dev_id, ['RUL']] = \
+            df_test['cycles'].max() - df_test['cycles']
+
+
+    parameters = ['cycles', 'setting1', 'setting2', 'setting3']
+    #parameters = ['setting1', 'setting2', 'setting3']
+    sensors = ['sensor'+str(i+1) for i in np.arange(0, 21)]
+    parameters += sensors
+
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(df_train[parameters].values)
+    y_train = np.asarray(df_train['Y']).ravel()
+    X_test = scaler.fit_transform(df_test[parameters].values)
+    y_test = np.asarray(df_test['Y']).ravel()
+
+    return X_train, y_train, X_test, y_test
 
   def load_data(self, data, events):
 
@@ -80,12 +135,12 @@ class LongitudinalClassification:
     self.buildModel()
     self.__model.summary()
 
-    #self.__model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
-    self.__model.compile(optimizer='sgd', loss=custom_loss(events), metrics=['categorical_accuracy'])
+    self.__model.compile(optimizer='sgd', loss='binary_crossentropy', metrics=['accuracy'])
+    #self.__model.compile(optimizer='sgd', loss=custom_loss(events), metrics=['categorical_accuracy'])
     history = self.__model.fit(X, y,
-                    batch_size=self.__batch, nb_epoch=self.__epochs,
+                    batch_size=self.__batch, epochs=self.__epochs,
                     verbose=1, validation_data=(X_test, y_test))
-    score = self.__model.evaluate(X_test, y_test, verbose=0)
+    score = self.__model.evaluate(X_test, y_test, verbose=1)
 
     #metric = Metrics()
     #y_hat_test = self.__model.predict_proba(X_test)
@@ -108,7 +163,7 @@ class LongitudinalClassification:
 class TestLongitudinalClassification(TestCase):                                                                                                         
   def setUp(self):
 
-    self.__lclass = LongitudinalClassification(128, 10, 20, 784)
+    self.__lclass = LongitudinalClassification(20, 2, 20, 25)
     
   def tearDown(self):
 
@@ -131,7 +186,7 @@ class TestLongitudinalClassification(TestCase):
 
     data_file = DATA_DIR+'TAKEOFF_EGT_9_18_2018.csv'
 
-    self.__lclass.load_data(data_file, fail)
+    #self.__lclass.load_data(data_file, fail)
 
     #(X_train, y_train), (X_test, y_test) = mnist.load_data()
     #print(y_train[10:])
@@ -154,6 +209,36 @@ class TestLongitudinalClassification(TestCase):
 
     #self.__mnist.fit(X_train, Y_train, X_test, Y_test)
     #self.__mnist.save()
+
+  def testBNASAChallenge(self): 
+
+    fail = {}
+    fail[735072] = datetime.strptime('2015-12-01', '%Y-%m-%d')
+    fail[735076] = datetime.strptime('2016-06-02', '%Y-%m-%d')
+    fail[735083] = datetime.strptime('2017-01-03', '%Y-%m-%d')
+    fail[733548] = datetime.strptime('2017-04-10', '%Y-%m-%d')
+    fail[733544] = datetime.strptime('2017-10-26', '%Y-%m-%d')
+    fail[735087] = datetime.strptime('2017-12-12', '%Y-%m-%d')
+    fail[735135] = datetime.strptime('2018-01-18', '%Y-%m-%d')
+    fail[733642] = datetime.strptime('2018-01-29', '%Y-%m-%d')
+    fail[735014] = datetime.strptime('2018-05-29', '%Y-%m-%d')
+    fail[735155] = datetime.strptime('2018-06-26', '%Y-%m-%d')
+    fail[733671] = datetime.strptime('2018-08-13', '%Y-%m-%d')
+
+    train_file = DATA_DIR+'train.txt'
+    test_file = DATA_DIR+'test.txt'
+
+    (X_train, y_train, X_test, y_test) = self.__lclass.load_nasa_challenge_data(train_file, test_file, fail)
+    #input_dim = X_train.shape[1]
+    nb_classes = 2
+    print(y_train.shape)
+    print(type(y_train))
+    
+    # convert class vectors to binary class matrices
+    y_train = np_utils.to_categorical(y_train, nb_classes)
+    y_test = np_utils.to_categorical(y_test, nb_classes)
+
+    self.__lclass.fit(X_train, y_train, X_test, y_test, fail)
 
 
 def suite():
