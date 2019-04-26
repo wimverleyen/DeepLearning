@@ -22,6 +22,27 @@ import keras.backend as K
 DATA_DIR = "/Users/UCRP556/code/networks/data/NASA/Challenge_Data/"
 
 
+def longitudinal_batch(data, labels, ts, batch_size):
+
+  num_batches_per_epoch = int((len(data) - 1) / batch_size) + 1
+  print('batch/epoch', num_batches_per_epoch)
+
+  def longitudinal_generator():
+    data_size = data.shape[0]
+    print(data_size)
+    while True:
+      shuffle_indices = np.random.permutation(np.arange(data_size))
+      shuffled_data = data[shuffle_indices]
+      shuffled_labels = labels[shuffle_indices]
+      
+      for batch_num in range(num_batches_per_epoch):
+        start_index = batch_num * batch_size
+        end_index = min((batch_num + 1) * batch_size, data_size)
+        X, y = shuffled_data[start_index: end_index], shuffled_labels[start_index: end_index]
+        yield X, y
+
+  return num_batches_per_epoch, longitudinal_generator()
+
 
 def custom_loss(ts, events, epsilon=.001):
   """
@@ -38,6 +59,8 @@ def custom_loss(ts, events, epsilon=.001):
     return 0
 
   return loss
+
+
 
 
 
@@ -60,7 +83,7 @@ class LongitudinalClassification:
     del self.__input_dim
     del self.__model
 
-  def buildModel(self):
+  def build_model(self):
 
     self.__model = Sequential()
     #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='softmax'))
@@ -71,7 +94,7 @@ class LongitudinalClassification:
     #self.__model.add(Dense(2, activation='sigmoid'))
     self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='sigmoid'))
 
-  def load_nasa_challenge_data(self, train_file, test_file, events, train_gap=20):
+  def load_nasa_challenge_data(self, train_file, test_file, train_gap=20):
 
     columns = ['device_id', 'cycles', 'setting1', 'setting2', 'setting3']
     sensors = ['sensor'+str(i+1) for i in np.arange(0, 23)]
@@ -135,7 +158,7 @@ class LongitudinalClassification:
 
   def fit(self, X, y, X_test, y_test, events):
 
-    self.buildModel()
+    self.build_model()
     self.__model.summary()
 
     self.__model.compile(optimizer='sgd', loss='binary_crossentropy', metrics=['accuracy'])
@@ -151,8 +174,19 @@ class LongitudinalClassification:
     #  print("i= %d; AUROC= %.5lf" % (i, 1-metric.AUROC(y_test[:,i], y_hat_test[:,i])))
     #del metric
 
-  def save(self):
+  def fit_generator(self, X, y, X_test, y_test):
 
+    self.build_model()
+    self.__model.summary()
+   
+    self.__model.compile(optimizer='sgd', loss='binary_crossentropy', metrics=['accuracy'])
+
+    train_steps, train_batches = longitudinal_batch(X, y, 30, 1000)
+    test_steps, test_batches = longitudinal_batch(X_test, y_test, 30, 1000)
+
+    self.__model.fit_generator(train_batches, train_steps, epochs=1, validation_data=test_batches, validation_steps=test_steps) 
+
+  def save(self):
     json_string = self.__model.to_json()
     open('longitudinal_logistic_model.json', 'w').write(json_string)
     yaml_string = self.__model.to_yaml()
@@ -215,23 +249,10 @@ class TestLongitudinalClassification(TestCase):
 
   def testBNASAChallenge(self): 
 
-    fail = {}
-    fail[735072] = datetime.strptime('2015-12-01', '%Y-%m-%d')
-    fail[735076] = datetime.strptime('2016-06-02', '%Y-%m-%d')
-    fail[735083] = datetime.strptime('2017-01-03', '%Y-%m-%d')
-    fail[733548] = datetime.strptime('2017-04-10', '%Y-%m-%d')
-    fail[733544] = datetime.strptime('2017-10-26', '%Y-%m-%d')
-    fail[735087] = datetime.strptime('2017-12-12', '%Y-%m-%d')
-    fail[735135] = datetime.strptime('2018-01-18', '%Y-%m-%d')
-    fail[733642] = datetime.strptime('2018-01-29', '%Y-%m-%d')
-    fail[735014] = datetime.strptime('2018-05-29', '%Y-%m-%d')
-    fail[735155] = datetime.strptime('2018-06-26', '%Y-%m-%d')
-    fail[733671] = datetime.strptime('2018-08-13', '%Y-%m-%d')
-
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
-    (X_train, y_train, X_test, y_test) = self.__lclass.load_nasa_challenge_data(train_file, test_file, fail)
+    (X_train, y_train, X_test, y_test) = self.__lclass.load_nasa_challenge_data(train_file, test_file)
     #input_dim = X_train.shape[1]
     nb_classes = 2
     
@@ -239,16 +260,30 @@ class TestLongitudinalClassification(TestCase):
     y_train = np_utils.to_categorical(y_train, nb_classes)
     y_test = np_utils.to_categorical(y_test, nb_classes)
 
-    self.__lclass.fit(X_train, y_train, X_test, y_test, fail)
+    #self.__lclass.fit(X_train, y_train, X_test, y_test, fail)
+
+  def testCNASAChallenge(self): 
+
+    train_file = DATA_DIR+'train.txt'
+    test_file = DATA_DIR+'test.txt'
+
+    (X_train, y_train, X_test, y_test) = self.__lclass.load_nasa_challenge_data(train_file, test_file)
+    #input_dim = X_train.shape[1]
+    nb_classes = 2
+    
+    # convert class vectors to binary class matrices
+    y_train = np_utils.to_categorical(y_train, nb_classes)
+    y_test = np_utils.to_categorical(y_test, nb_classes)
+
+    #self.__lclass.fit(X_train, y_train, X_test, y_test, fail)
+    self.__lclass.fit_generator(X_train, y_train, X_test, y_test)
+
 
 
 def suite():
   suite = makeSuite(TestLongitudinalClassification, 'test')
   return suite
 
+
 if __name__ == "__main__":
   main(defaultTest='suite', argv=['-d'])
-
-
-
-
