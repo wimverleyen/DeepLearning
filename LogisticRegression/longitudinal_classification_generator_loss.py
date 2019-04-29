@@ -18,18 +18,53 @@ import keras.backend as K
 
 #from performance.metrics import Metrics
 
-#DATA_DIR = "/home/laptop/Documents/data/aviation/OTD/"
-DATA_DIR = "/Users/UCRP556/code/networks/data/NASA/Challenge_Data/"
+DATA_DIR = "/home/laptop/Documents/data/aviation/NASA/Challenge_Data/"
+#DATA_DIR = "/Users/UCRP556/code/networks/data/NASA/Challenge_Data/"
 
 
-def longitudinal_batch(data, labels, ts, batch_size):
+def longitudinal_batch(data, labels, ts, batch_size, step=10, window=100):
+
+  ix1 = np.where((data[:,data.shape[1]-1]>ts))
+  ix2 = np.where((data[:,data.shape[1]-1]<ts+window))
+  ix = np.intersect1d(ix1[0], ix2[0])
+  #ix = np.where((data[:,data.shape[1]-1]>ts))
+  data = data[ix,:]
+  labels = labels[ix,:]
+  data_size = data.shape[0]
 
   num_batches_per_epoch = int((len(data) - 1) / batch_size) + 1
   print('batch/epoch', num_batches_per_epoch)
 
   def longitudinal_generator():
-    data_size = data.shape[0]
-    print(data_size)
+    
+    i = 0
+    while True:
+      shuffle_indices = np.random.permutation(np.arange(data_size))
+      shuffled_data = data[shuffle_indices]
+      shuffled_labels = labels[shuffle_indices]
+      
+      i += 1
+      for batch_num in range(num_batches_per_epoch):
+        start_index = batch_num * batch_size
+        end_index = min((batch_num + 1) * batch_size, data_size)
+        X, y = shuffled_data[start_index: end_index], shuffled_labels[start_index: end_index]
+        yield X, y
+
+  return num_batches_per_epoch, longitudinal_generator()
+
+
+def longitudinal_batch_train(data, labels, ts, batch_size):
+
+  ix = np.where((data[:,data.shape[1]-1]<ts))
+  data = data[ix]
+  labels = labels[ix]
+  data_size = data.shape[0]
+
+  num_batches_per_epoch = int((len(data) - 1) / batch_size) + 1
+  print('batch/epoch', num_batches_per_epoch)
+
+  def longitudinal_generator():
+    
     while True:
       shuffle_indices = np.random.permutation(np.arange(data_size))
       shuffled_data = data[shuffle_indices]
@@ -44,13 +79,38 @@ def longitudinal_batch(data, labels, ts, batch_size):
   return num_batches_per_epoch, longitudinal_generator()
 
 
-def custom_loss(ts, events, epsilon=.001):
+def longitudinal_batch_test(data, labels, ts, batch_size):
+
+  ix = np.where((data[:,data.shape[1]-1]>ts))
+  data = data[ix]
+  labels = labels[ix]
+  data_size = data.shape[0]
+
+  num_batches_per_epoch = int((len(data) - 1) / batch_size) + 1
+  print('batch/epoch', num_batches_per_epoch)
+
+  def longitudinal_generator():
+    
+    while True:
+      shuffle_indices = np.random.permutation(np.arange(data_size))
+      shuffled_data = data[shuffle_indices]
+      shuffled_labels = labels[shuffle_indices]
+      
+      for batch_num in range(num_batches_per_epoch):
+        start_index = batch_num * batch_size
+        end_index = min((batch_num + 1) * batch_size, data_size)
+        X, y = shuffled_data[start_index: end_index], shuffled_labels[start_index: end_index]
+        yield X, y
+
+  return num_batches_per_epoch, longitudinal_generator()
+
+
+def longitudinal_loss(events, epsilon=.001):
   """
     function closure:
     https://towardsdatascience.com/advanced-keras-constructing-complex-custom-losses-and-metrics-c07ca130a618
   """
 
-  print('ts= ', ts)
   
   
 
@@ -124,22 +184,45 @@ class LongitudinalClassification:
       df_test.loc[df_test['device_id'] == dev_id, ['RUL']] = \
             df_test['cycles'].max() - df_test['cycles']
 
-
-    parameters = ['cycles', 'setting1', 'setting2', 'setting3']
-    #parameters = ['setting1', 'setting2', 'setting3']
+    #parameters = ['cycles', 'setting1', 'setting2', 'setting3']
+    parameters = ['setting1', 'setting2', 'setting3']
     sensors = ['sensor'+str(i+1) for i in np.arange(0, 21)]
     parameters += sensors
 
     df_train.sort_values(by=['cycles'], ascending=True, inplace=True)
     df_test.sort_values(by=['cycles'], ascending=True, inplace=True)
 
+    d = {}
+    d['device_id'] = []
+    d['cycles'] = []
+    for dev_id in df_train['device_id'].unique():
+      d['device_id'].append(dev_id)
+      d['cycles'].append(df_train[df_train['device_id'] == dev_id]['cycles'].max())
+
+    df_train_events = pd.DataFrame(data=d)
+    df_train_events.sort_values(by=['cycles'], ascending=True, inplace=True)
+
+    d = {}
+    d['device_id'] = []
+    d['cycles'] = []
+    for dev_id in df_test['device_id'].unique():
+      d['device_id'].append(dev_id)
+      d['cycles'].append(df_test[df_test['device_id'] == dev_id]['cycles'].max())
+
+    df_test_events = pd.DataFrame(data=d)
+    df_test_events.sort_values(by=['cycles'], ascending=True, inplace=True)
+
     scaler = StandardScaler()
     X_train = scaler.fit_transform(df_train[parameters].values)
     y_train = np.asarray(df_train['Y']).ravel()
+    X_train = np.concatenate((X_train, df_train['cycles'].values.reshape((df_train['cycles'].values.shape[0], 1))), axis=1)
+
     X_test = scaler.fit_transform(df_test[parameters].values)
     y_test = np.asarray(df_test['Y']).ravel()
+    X_test = np.concatenate((X_test, df_test['cycles'].values.reshape((df_test['cycles'].values.shape[0], 1))), axis=1)
+    #np.concatenate((X_test, df_test['cycles'].values), axis=1)
 
-    return X_train, y_train, X_test, y_test
+    return X_train, y_train, X_test, y_test, df_train_events, df_test_events
 
   def load_data(self, data, events):
 
@@ -174,17 +257,56 @@ class LongitudinalClassification:
     #  print("i= %d; AUROC= %.5lf" % (i, 1-metric.AUROC(y_test[:,i], y_hat_test[:,i])))
     #del metric
 
-  def fit_generator(self, X, y, X_test, y_test):
+  def fit_generator_split(self, X, y, X_test, y_test, ts=30):
 
     self.build_model()
     self.__model.summary()
    
     self.__model.compile(optimizer='sgd', loss='binary_crossentropy', metrics=['accuracy'])
+    #self.__model.compile(optimizer='sgd', loss=longitudinal_loss(ts), metrics=['accuracy'])
 
-    train_steps, train_batches = longitudinal_batch(X, y, 30, 1000)
-    test_steps, test_batches = longitudinal_batch(X_test, y_test, 30, 1000)
+    train_step = []
+    train_batch = []
+    test_step = []
+    test_batch = []
+    for i in np.arange(0, 30):
+      ts_now = ts + i*(10)
+      train_steps, train_batches = longitudinal_batch(X, y, ts_now, 100)
+      test_steps, test_batches = longitudinal_batch(X_test, y_test, ts_now, 50)
+      train_step.append(train_steps)
+      train_batch.append(train_batches)
+      test_step.append(test_steps)
+      test_batch.append(test_batches)
 
-    self.__model.fit_generator(train_batches, train_steps, epochs=1, validation_data=test_batches, validation_steps=test_steps) 
+    self.__model.fit_generator(train_batches, train_steps, epochs=20, validation_data=test_batches, \
+                            validation_steps=test_steps) 
+
+  def fit_generator(self, X, y, X_test, y_test, events):
+
+    self.build_model()
+    self.__model.summary()
+
+    self.__model.compile(optimizer='sgd', loss='binary_crossentropy', metrics=['accuracy'])
+    #self.__model.compile(optimizer='sgd', loss=longitudinal_loss(events), metrics=['accuracy'])
+
+    train_step = []
+    train_batch = []
+    test_step = []
+    test_batch = []
+    #for row in events.tail(100).itertuples():
+    for row in events.tail(100).iterrows():
+      row = row[1]
+      split = row[1]
+      train_steps, train_batches = longitudinal_batch_train(X, y, split, 100)
+      test_steps, test_batches = longitudinal_batch_test(X, y, split, 100)
+      train_step.append(train_steps)
+      train_batch.append(train_batches)
+      test_step.append(test_steps)
+      test_batch.append(test_batches)
+
+    self.__model.fit_generator(train_batches, train_steps, epochs=20, validation_data=train_batch, \
+                            validation_steps=train_step) 
+
 
   def save(self):
     json_string = self.__model.to_json()
@@ -252,7 +374,8 @@ class TestLongitudinalClassification(TestCase):
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
-    (X_train, y_train, X_test, y_test) = self.__lclass.load_nasa_challenge_data(train_file, test_file)
+    (X_train, y_train, X_test, y_test, events_train, events_test) = \
+            self.__lclass.load_nasa_challenge_data(train_file, test_file)
     #input_dim = X_train.shape[1]
     nb_classes = 2
     
@@ -267,7 +390,9 @@ class TestLongitudinalClassification(TestCase):
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
-    (X_train, y_train, X_test, y_test) = self.__lclass.load_nasa_challenge_data(train_file, test_file)
+    (X_train, y_train, X_test, y_test, events_train, events_test) = \
+            self.__lclass.load_nasa_challenge_data(train_file, test_file)
+
     #input_dim = X_train.shape[1]
     nb_classes = 2
     
@@ -276,7 +401,8 @@ class TestLongitudinalClassification(TestCase):
     y_test = np_utils.to_categorical(y_test, nb_classes)
 
     #self.__lclass.fit(X_train, y_train, X_test, y_test, fail)
-    self.__lclass.fit_generator(X_train, y_train, X_test, y_test)
+    #self.__lclass.fit_generator(X_train, y_train, X_test, y_test)
+    self.__lclass.fit_generator(X_train, y_train, X_test, y_test, events_test)
 
 
 
