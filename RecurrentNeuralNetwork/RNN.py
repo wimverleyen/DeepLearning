@@ -10,7 +10,7 @@ from datetime import datetime
 from scipy.stats import rankdata
 
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import confusion_matrix
 
 from keras.models import Sequential
@@ -21,7 +21,9 @@ import keras.backend as K
 
 #from performance.metrics import Metrics
 
-DATA_DIR = "/home/laptop/Documents/data/aviation/NASA/Challenge_Data/"
+#DATA_DIR = "/home/laptop/Documents/data/aviation/NASA/Challenge_Data/"
+DATA_DIR = "/Users/UCRP556/data/Aviation/Challenge_Data/"
+
 
 class RNN:
 
@@ -41,6 +43,20 @@ class RNN:
     del self.__input_dim
     del self.__window
     del self.__model
+
+  def build_model_random(self):
+
+    self.__model = Sequential()
+   
+    self.__model.add(LSTM(output_dim=50, input_shape=(self.__window, self.__input_dim), return_sequences=True))
+    self.__model.add(Dropout(0.2))
+    
+    self.__model.add(LSTM(100, return_sequences=False))
+    self.__model.add(Dropout(0.2))
+
+    self.__model.add(Dense(output_dim=1))
+    self.__model.model.add(Activation("linear")) 
+
 
   def build_model_1(self, layers):
     self.__model = Sequential()
@@ -73,6 +89,17 @@ class RNN:
     #model.add(TimeDistributed(Dense(vocabulary)))
     #self.__model.add(Activation('linear'))
     self.__model.add(Dense(1, activation='linear'))
+
+  def load_random_data(self):
+
+    # samples, timestamps, and features
+    X_train = np.random.random_sample((1125, 75, 2))
+    y_train = np.random.random_sample((1125))
+
+    X_test = np.random.random_sample((1125, 75, 2))
+    y_test = np.random.random_sample((1125))
+
+    return (X_train, y_train, X_test, y_test)
 
   def load_nasa_challenge_data(self, train_file, test_file, train_gap=20):
 
@@ -132,8 +159,8 @@ class RNN:
     df_test_events = pd.DataFrame(data=d)
     df_test_events.sort_values(by=['cycles'], ascending=True, inplace=True)
 
-    scaler = StandardScaler()
-    #scaler = MinMaxScaler(feature_range=(0, 1))
+    #scaler = StandardScaler()
+    scaler = MinMaxScaler(feature_range=(0, 1))
     X_train = scaler.fit_transform(df_train[parameters].values)
     y_train = np.asarray(df_train['RUL']).ravel()
     X_test = scaler.fit_transform(df_test[parameters].values)
@@ -161,15 +188,22 @@ class RNN:
     y_test_seq = np.array(y_test_seq)
 
     print(X_train_seq.shape)
+    print(y_train_seq.shape)
+    print(X_test_seq.shape)
+    print(y_test_seq.shape)
     #X_train_seq = np.reshape(X_train_seq, (X_train_seq.shape[0], 1, X_train_seq.shape[1]))
     #X_test_seq = np.reshape(X_test_seq, (X_test_seq.shape[0], 1, X_test_seq.shape[1]))
 
     return X_train_seq, y_train_seq, X_test_seq, y_test_seq, df_train_events, df_test_events
 
-  def fit(self, X, y, X_test, y_test, events):
+  def series_to_supervised(self):
+    pass
+
+
+  def fit(self, X, y, X_test, y_test):
 
     #self.build_model([1, sequence_length, int(sequence_length*2), int(sequence_length*4), 1])
-    self.build_model_1([1, self.__window, int(self.__window*2), int(self.__window*4), 1])
+    self.build_model()
     self.__model.summary()
 
     #self.__model.compile(optimizer='sgd', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
@@ -196,12 +230,41 @@ class RNN:
     print(y_hat_test.mean())
     print(y_hat_test.shape)
 
+  def fit_random(self, X, y, X_test, y_test):
+
+    self.build_model_random()
+    self.__model.summary()
+
+    self.__model.compile(optimizer='rmsprop', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
+    #self.__model.compile(optimizer='sgd', loss=longitudinal_loss(events), metrics=['categorical_accuracy'])
+    history = self.__model.fit(X, y, \
+                    batch_size=self.__batch, epochs=self.__epochs, \
+                    verbose=1, validation_data=(X_test, y_test))
+    score = self.__model.evaluate(X_test, y_test, verbose=1)
+    print(score)
+
+    #metric = Metrics()
+    #y_hat_test = self.__model.predict(X_test)
+    y_hat_train = self.__model.predict(X)
+    y_hat_test = self.__model.predict(X_test)
+
+    #y_hat_test = y_hat_test[:,0]
+    #print(confusion_matrix(y_test, y_hat_test))
+    print(y_hat_train)
+    print(y_hat_train.mean())
+    print(y_hat_train.shape)
+
+    print(y_hat_test)
+    print(y_hat_test.mean())
+    print(y_hat_test.shape)
+
+
 
 class TestRNN(TestCase):
 
   def setUp(self):
 
-    self.__rnn = RNN(20, 10, 25, 1)
+    self.__rnn = RNN(20, 10, 25, 75)
     
   def tearDown(self):
 
@@ -253,10 +316,22 @@ class TestRNN(TestCase):
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
+    rnn = RNN(20, 10, 25, 75)
     (X_train, y_train, X_test, y_test, events_train, events_test) = \
-            self.__rnn.load_nasa_challenge_data(train_file, test_file)
+            rnn.load_nasa_challenge_data(train_file, test_file)
+   
+    (X_train, y_train, X_test, y_test) = rnn.load_random_data()
+    #rnn.fit(X_train, y_train, X_test, y_test)
     
-    self.__rnn.fit(X_train, y_train, X_test, y_test, events_test)
+    del rnn
+
+  def testCRandom(self):
+
+    #rnn = RNN(20, 10, 2, 75)
+    #(X_train, y_train, X_test, y_test) = rnn.load_random_data()
+    #rnn.fit_random(X_train, y_train, X_test, y_test)
+    #del rnn
+    pass
 
 
 def suite():
