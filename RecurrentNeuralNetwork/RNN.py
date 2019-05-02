@@ -5,6 +5,7 @@ from unittest import makeSuite, TestCase, main
 import numpy as np
 import pandas as pd
 
+import pickle
 from datetime import datetime
 
 from scipy.stats import rankdata
@@ -21,8 +22,8 @@ import keras.backend as K
 
 #from performance.metrics import Metrics
 
-#DATA_DIR = "/home/laptop/Documents/data/aviation/NASA/Challenge_Data/"
-DATA_DIR = "/Users/UCRP556/data/Aviation/Challenge_Data/"
+DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
+#DATA_DIR = "/Users/UCRP556/data/Aviation/Challenge_Data/"
 
 
 class RNN:
@@ -35,6 +36,7 @@ class RNN:
     self.__window = window
     
     self.__model = None
+    self.__history = None
 
   def __del__(self):
 
@@ -57,38 +59,32 @@ class RNN:
     self.__model.add(Dense(output_dim=1))
     self.__model.model.add(Activation("linear")) 
 
-
-  def build_model_1(self, layers):
-    self.__model = Sequential()
-
-    self.__model.add(LSTM(input_shape=(layers[1], layers[0]),
-                   output_dim=layers[1], return_sequences=True))
-                                          
-    self.__model.add(Dropout(0.2))
-    self.__model.add(LSTM(layers[2], return_sequences=True))
-    self.__model.add(Dropout(0.2))
-
-    self.__model.add(LSTM(layers[3], return_sequences=False))
-    self.__model.add(Dropout(0.2))
-                                      
-    self.__model.add(Dense(output_dim=layers[3]))
-    self.__model.add(Activation("linear"))
-
   def build_model(self):
 
     self.__model = Sequential()
+   
+    self.__model.add(LSTM(output_dim=50, input_shape=(self.__window, self.__input_dim), return_sequences=True))
+    self.__model.add(Dropout(0.2))
+    
+    self.__model.add(LSTM(100, return_sequences=False))
+    self.__model.add(Dropout(0.2))
+
+    self.__model.add(Dense(output_dim=1))
+    self.__model.model.add(Activation("linear"))
+
+    #self.__model = Sequential()
     #self.__model.add(Dense(16, input_dim=self.__input_dim, activation='sigmoid'))
     #model.add(Embedding(vocabulary, hidden_size, input_length=num_steps))
     #self.__model.add(LSTM(4, input_shape=(50, 3, 1), return_sequences=True))
     #self.__model.add(LSTM(units=4, input_shape=(1, 1), stateful=True))
-    self.__model.add(LSTM(units=16, input_shape=(self.__window, self.__input_dim)))
-    self.__model.add(LSTM(units=16))
+    #self.__model.add(LSTM(units=16, input_shape=(self.__window, self.__input_dim)))
+    #self.__model.add(LSTM(units=16))
     #self.__model.add(LSTM(16, return_sequences=True))
     #self.__model.add(Dropout(0.2))
     #self.__model.add(LSTM(units=16))
     #model.add(TimeDistributed(Dense(vocabulary)))
     #self.__model.add(Activation('linear'))
-    self.__model.add(Dense(1, activation='linear'))
+    #self.__model.add(Dense(1, activation='linear'))
 
   def load_random_data(self):
 
@@ -166,13 +162,17 @@ class RNN:
     X_test = scaler.fit_transform(df_test[parameters].values)
     y_test = np.asarray(df_test['RUL']).ravel()
 
+    print(y_train.shape)
+    print(y_test.shape)
+
     n = X_train.shape[0]
     
     X_train_seq = []
     y_train_seq = []
     for k in range(n - self.__window + 1):
       X_train_seq.append(X_train[k : k + self.__window])
-      y_train_seq.append(y_train[k : k + self.__window])
+    for k in np.arange(n - self.__window + 1):
+      y_train_seq.append(y_train[k])
 
     X_train_seq = np.array(X_train_seq)
     y_train_seq = np.array(y_train_seq)
@@ -182,7 +182,8 @@ class RNN:
     y_test_seq = []
     for k in range(n - self.__window + 1):
       X_test_seq.append(X_test[k : k + self.__window])
-      y_test_seq.append(y_test[k : k + self.__window])
+    for k in np.arange(n - self.__window + 1):
+      y_test_seq.append(y_test[k])
 
     X_test_seq = np.array(X_test_seq)
     y_test_seq = np.array(y_test_seq)
@@ -191,8 +192,6 @@ class RNN:
     print(y_train_seq.shape)
     print(X_test_seq.shape)
     print(y_test_seq.shape)
-    #X_train_seq = np.reshape(X_train_seq, (X_train_seq.shape[0], 1, X_train_seq.shape[1]))
-    #X_test_seq = np.reshape(X_test_seq, (X_test_seq.shape[0], 1, X_test_seq.shape[1]))
 
     return X_train_seq, y_train_seq, X_test_seq, y_test_seq, df_train_events, df_test_events
 
@@ -209,11 +208,15 @@ class RNN:
     #self.__model.compile(optimizer='sgd', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
     self.__model.compile(optimizer='rmsprop', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
     #self.__model.compile(optimizer='sgd', loss=longitudinal_loss(events), metrics=['categorical_accuracy'])
-    history = self.__model.fit(X, y, \
+    self.__history = self.__model.fit(X, y, \
                     batch_size=self.__batch, epochs=self.__epochs, \
                     verbose=1, validation_data=(X_test, y_test))
     score = self.__model.evaluate(X_test, y_test, verbose=1)
     print(score)
+
+    with open(DATA_DIR+'model/RNN_history.pkl', 'wb') as handler:
+      pickle.dump(self.__history.history, handler)
+    handler.close()
 
     #metric = Metrics()
     #y_hat_test = self.__model.predict(X_test)
@@ -258,6 +261,16 @@ class RNN:
     print(y_hat_test.mean())
     print(y_hat_test.shape)
 
+  def save(self):
+
+    json_string = self.__model.to_json()
+    handler = open(DATA_DIR+'model/longitudinal_logistic_model.json', 'w')
+    handler.write(json_string)
+    handler.close()
+    yaml_string = self.__model.to_yaml()
+    handler = open(DATA_DIR+'model/longitudinal_logistic_model.yaml', 'w')
+    handler.write(yaml_string)
+    handler.close()
 
 
 class TestRNN(TestCase):
@@ -316,13 +329,12 @@ class TestRNN(TestCase):
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
-    rnn = RNN(20, 10, 25, 75)
+    rnn = RNN(20, 80, 25, 75)
     (X_train, y_train, X_test, y_test, events_train, events_test) = \
             rnn.load_nasa_challenge_data(train_file, test_file)
    
-    (X_train, y_train, X_test, y_test) = rnn.load_random_data()
-    #rnn.fit(X_train, y_train, X_test, y_test)
-    
+    rnn.fit(X_train, y_train, X_test, y_test)
+    rnn.save()
     del rnn
 
   def testCRandom(self):
