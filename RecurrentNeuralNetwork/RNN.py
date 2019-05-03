@@ -4,6 +4,7 @@ from unittest import makeSuite, TestCase, main
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 import pickle
 from datetime import datetime
@@ -14,7 +15,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import confusion_matrix
 
-from keras.models import Sequential
+from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Activation, Dropout, LSTM
 from keras.datasets import mnist
 from keras.utils import np_utils
@@ -24,6 +25,37 @@ import keras.backend as K
 
 DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
 #DATA_DIR = "/Users/UCRP556/data/Aviation/Challenge_Data/"
+
+def rul_loss(a_1=13, a_2=10):
+  """
+    function closure:
+    https://towardsdatascience.com/advanced-keras-constructing-complex-custom-losses-and-metrics-c07ca130a618
+  """
+
+
+  def loss(y_true, y_pred):
+
+    d = y_pred - y_true
+    """
+    dmin = tf.exp(-(d/float(a_1))) -1
+    dmax = tf.exp(d/float(a_2)) - 1
+    s = tf.zeros_like(d)
+    flags = tf.math.greater(d, s)
+    ix = tf.to_int32(tf.where(flags))
+    s[ix] = dmin[ix]
+    flags = tf.math.less(d, tf.zeros_like(d))
+    ix = tf.to_int32(tf.where(flags))
+    s[ix] = dmax[ix]
+    """
+
+    s = tf.where(d < 0,  tf.exp(-(d/float(a_1))) -1, tf.exp(d/float(a_2)) - 1)
+
+    #return K.mean(K.square(y_pred - y_true), K.square(layer), axis=-1)
+    #print(confusion_matrix(y_true, y_pred))
+    #return K.mean(K.square(y_pred - y_true))
+    return K.sum(s)
+
+  return loss
 
 
 class RNN:
@@ -199,14 +231,15 @@ class RNN:
     pass
 
 
-  def fit(self, X, y, X_test, y_test):
+  def fit(self, X, y, X_test, y_test, name='RNN_NASA_Challenge'):
 
     #self.build_model([1, sequence_length, int(sequence_length*2), int(sequence_length*4), 1])
     self.build_model()
     self.__model.summary()
 
     #self.__model.compile(optimizer='sgd', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
-    self.__model.compile(optimizer='rmsprop', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
+    #self.__model.compile(optimizer='rmsprop', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
+    self.__model.compile(optimizer='rmsprop', loss=rul_loss(), metrics=['mae', 'acc'])
     #self.__model.compile(optimizer='sgd', loss=longitudinal_loss(events), metrics=['categorical_accuracy'])
     self.__history = self.__model.fit(X, y, \
                     batch_size=self.__batch, epochs=self.__epochs, \
@@ -214,7 +247,7 @@ class RNN:
     score = self.__model.evaluate(X_test, y_test, verbose=1)
     print(score)
 
-    with open(DATA_DIR+'model/RNN_history.pkl', 'wb') as handler:
+    with open(DATA_DIR+'model/'+name+'_history.pkl', 'wb') as handler:
       pickle.dump(self.__history.history, handler)
     handler.close()
 
@@ -261,16 +294,38 @@ class RNN:
     print(y_hat_test.mean())
     print(y_hat_test.shape)
 
-  def save(self):
+  def save(self, name='RNN_NASA_Challenge'):
 
     json_string = self.__model.to_json()
-    handler = open(DATA_DIR+'model/longitudinal_logistic_model.json', 'w')
+    handler = open(DATA_DIR+'model/'+name+'.json', 'w')
     handler.write(json_string)
     handler.close()
     yaml_string = self.__model.to_yaml()
-    handler = open(DATA_DIR+'model/longitudinal_logistic_model.yaml', 'w')
+    handler = open(DATA_DIR+'model/'+name+'.yaml', 'w')
     handler.write(yaml_string)
     handler.close()
+    self.__model.save_weights(DATA_DIR+'model/'+name+'.h5')
+
+  def test(self, X_test, y_test, name='RNN_NASA_Challenge'):
+
+    with open(DATA_DIR+'model/'+name+'.json', 'r') as handler:
+      json_string = handler.read()
+      self.__model = model_from_json(json_string)
+    handler.close()
+
+    self.__model.load_weights(DATA_DIR+'model/'+name+'.h5')
+    self.__model.compile(optimizer='rmsprop', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
+    print(X_test.shape)
+    y_hat_test = self.__model.predict(X_test)
+
+    d = {}
+    d['y'] = y_test.ravel()
+    d['y_hat'] = y_hat_test.ravel()
+
+    df = pd.DataFrame(data=d)
+    df.to_csv(DATA_DIR+'model/'+name+'_y_test.csv', index=False)
+
+
 
 
 class TestRNN(TestCase):
@@ -329,15 +384,30 @@ class TestRNN(TestCase):
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
+    #rnn = RNN(20, 6, 25, 75)
+    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
+    #        rnn.load_nasa_challenge_data(train_file, test_file)
+    #rnn.fit(X_train, y_train, X_test, y_test)
+    #rnn.save()
+    #rnn.test(X_test, y_test)
+    #del rnn
+
+  def testCNASAChallenge(self): 
+
+    train_file = DATA_DIR+'train.txt'
+    test_file = DATA_DIR+'test.txt'
+
+    name = 'RNN_NASA_Challenge_RUL_loss'
+
     rnn = RNN(20, 80, 25, 75)
     (X_train, y_train, X_test, y_test, events_train, events_test) = \
             rnn.load_nasa_challenge_data(train_file, test_file)
-   
-    rnn.fit(X_train, y_train, X_test, y_test)
-    rnn.save()
+    rnn.fit(X_train, y_train, X_test, y_test, name=name)
+    rnn.save(name=name)
+    rnn.test(X_test, y_test, name=name)
     del rnn
 
-  def testCRandom(self):
+  def testDRandom(self):
 
     #rnn = RNN(20, 10, 2, 75)
     #(X_train, y_train, X_test, y_test) = rnn.load_random_data()
