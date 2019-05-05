@@ -129,13 +129,57 @@ class Metrics:
       if labels[index] == 1:                                                                                                    
         ranksum += rank                                                                                                              
       index += 1                                                                                                                     
-                                                                                                                                     
     value = ranksum - ((Npos * (Npos + 1))/float(2))                                                                                 
     if Npos > 0:                                                                                                                     
       value = value/float(Npos * Nneg)                                                                                               
     else:                                                                                                                            
       value = 0.5                                                                                                                    
     return 1 - value
+
+  def plot_loss_function(self, a_1=13, a_2=10, name='RNN_NASA_Challenge'):
+
+    fig = plt.figure()
+
+    fig.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, hspace=0.6, wspace=0.4)
+
+    add_plot = fig.add_subplot(1, 1, 1)
+  
+    ref_1 = np.linspace(0, -50, 100)
+    dmin = np.expm1(-(ref_1/float(a_1)))
+    ref_2 = np.linspace(0, 50, 100)
+    dmax = np.expm1(ref_2/float(a_2))
+
+    ref_3 = np.linspace(0, -50, 100)
+    lmin = np.expm1(-(ref_1/float(10)))
+    ref_4 = np.linspace(0, 50, 100)
+    lmax = np.expm1(ref_2/float(6))
+
+    add_plot.plot(ref_1, dmin, color='indianred', linewidth=.75)
+    add_plot.plot(ref_2, dmax, color='indianred', linewidth=.75, label='RUL score')
+    #add_plot.scatter(d, s, color='dodgerblue', s=.75)
+   
+    add_plot.plot(ref_3, lmin, color='black', linewidth=.75, label='loss function')
+    add_plot.plot(ref_4, lmax, color='black', linewidth=.75)
+
+    for tick in add_plot.xaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "Error"
+    add_plot.set_xlabel(label, fontsize=10)
+
+    for tick in add_plot.yaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "RUL score"
+    add_plot.set_ylabel(label, fontsize=10)
+    title = "RUL score = %.2f" % score
+    add_plot.set_title(title, fontsize=10)
+    add_plot.set_aspect(1./add_plot.get_data_ratio())
+    add_plot.legend(fontsize=8)
+    add_plot.grid(True)    
+
+    figname = FIG_DIR +name+"_loss_function.png"
+    fig.savefig(figname, format="png", dpi=300)
+
+    del fig
 
   def RUL_score(self, y, y_hat, a_1=13, a_2=10):
 
@@ -153,7 +197,7 @@ class Metrics:
 
     return s, s.sum()
 
-  def plot_RUL(self, y, y_hat, name='RNN_loss', a_1=13, a_2=10):
+  def plot_RUL(self, y, y_hat, name='RNN_NASA_Challenge', a_1=13, a_2=10):
 
     d = y_hat - y
     (s, score) = self.RUL_score(y, y_hat)
@@ -320,18 +364,18 @@ class TestMetrics(TestCase):
 
     y = np.random.uniform(0, 1, 3000)
     y_hat = np.random.uniform(0, 1, 3000)
-    self.__metric.RUL_score(y, y_hat)
+    #self.__metric.RUL_score(y, y_hat)
 
     name = 'RNN_NASA_Challenge_RUL'
     DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
     filename = DATA_DIR+'model/'+name+'_y_test.csv'
 
-    df = pd.read_csv(filename)
+    #df = pd.read_csv(filename)
     #print(df.head(n=5))
 
-    self.__metric.RUL_score(df['y'].values, df['y_hat'].values)
-    self.__metric.plot_RUL(df['y'].values, df['y_hat'].values, name=name)
-    self.__metric.plot_learning('RNN_NASA_Challenge_RUL_loss_history.pkl', name=name)
+    #self.__metric.RUL_score(df['y'].values, df['y_hat'].values)
+    #self.__metric.plot_RUL(df['y'].values, df['y_hat'].values, name=name)
+    #self.__metric.plot_learning('RNN_NASA_Challenge_RUL_loss_history.pkl', name=name)
 
     """
     name = 'RNN_NASA_Challenge_RUL_loss'
@@ -359,8 +403,8 @@ class TestMetrics(TestCase):
     filename = DATA_DIR+'model/'+name+'_y_test.csv'
     df = pd.read_csv(filename)
 
-    self.__metric.plot_RUL(df['y'].values, df['y_hat'].values, name=name+'_direct')
-    self.__metric.plot_learning('RNN_NASA_Challenge_RUL_loss_history.pkl', name=name) 
+    #self.__metric.plot_RUL(df['y'].values, df['y_hat'].values, name=name+'_direct')
+    #self.__metric.plot_learning('RNN_NASA_Challenge_RUL_loss_history.pkl', name=name) 
 
     #name = 'MLP_NASA_Challenge_RUL_loss'
     #DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
@@ -393,6 +437,10 @@ class TestMetrics(TestCase):
     #print(df.head(n=5))
 
     #self.__metric.RUL_score(df['y'].values, df['y_hat'].values)
+
+  def testCLossRUL(self): 
+
+    self.__metric.plot_loss_function()
 
 
 def suite():
