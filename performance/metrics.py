@@ -225,7 +225,7 @@ class Metrics:
 
   def plot_learning(self, name='RNN_leearning'):
 
-    handler = open(DATA_DIR+'model/'+name+'.pkl', 'rb')
+    handler = open(DATA_DIR+'model/'+name+'_history.pkl', 'rb')
     history = pickle.load(handler)
     handler.close()
 
