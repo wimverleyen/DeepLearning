@@ -223,7 +223,7 @@ class Metrics:
 
     del fig
 
-  def plot_learning(self, name='RNN_leearning'):
+  def plot_learning(self, name='RNN_leearning', epochs=100):
 
     handler = open(DATA_DIR+'model/'+name+'_history.pkl', 'rb')
     history = pickle.load(handler)
@@ -231,7 +231,7 @@ class Metrics:
 
     df = pd.DataFrame(data=history)
 
-    epochs = np.arange(0, 80, 1)
+    epochs = np.arange(0, epochs, 1)
 
     fig = plt.figure()
 
