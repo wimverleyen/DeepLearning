@@ -170,8 +170,6 @@ class Metrics:
       tick.label.set_fontsize(8) 
     label = "RUL score"
     add_plot.set_ylabel(label, fontsize=10)
-    title = "RUL score = %.2f" % score
-    add_plot.set_title(title, fontsize=10)
     add_plot.set_aspect(1./add_plot.get_data_ratio())
     add_plot.legend(fontsize=8)
     add_plot.grid(True)    
