@@ -4,16 +4,18 @@ from unittest import makeSuite, TestCase, main
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
+import pickle
 from datetime import datetime
 
 from scipy.stats import rankdata
 
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import confusion_matrix
 
-from keras.models import Sequential
+from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Activation, Dropout
 from keras.datasets import mnist
 from keras.utils import np_utils
@@ -21,7 +23,7 @@ import keras.backend as K
 
 #from performance.metrics import Metrics
 
-DATA_DIR = "/home/laptop/Documents/data/aviation/NASA/Challenge_Data/"
+DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
 #DATA_DIR = "/Users/UCRP556/code/networks/data/NASA/Challenge_Data/"
 
 #def longitudinal_loss(ts, events, epsilon=.001):
@@ -43,6 +45,34 @@ def longitudinal_loss(events, epsilon=.001):
   return loss
 
 
+def rul_loss(a_1=10, a_2=6):
+  """
+    function closure:
+    https://towardsdatascience.com/advanced-keras-constructing-complex-custom-losses-and-metrics-c07ca130a618
+  """
+
+
+  def loss(y_true, y_pred):
+
+    d = y_pred - y_true
+    """
+    dmin = tf.exp(-(d/float(a_1))) -1
+    dmax = tf.exp(d/float(a_2)) - 1
+    s = tf.zeros_like(d)
+    flags = tf.math.greater(d, s)
+    ix = tf.to_int32(tf.where(flags))
+    s[ix] = dmin[ix]
+    flags = tf.math.less(d, tf.zeros_like(d))
+    ix = tf.to_int32(tf.where(flags))
+    s[ix] = dmax[ix]
+    """
+
+    s = tf.where(d < 0,  tf.exp(-(d/float(a_1))) -1, tf.exp(d/float(a_2)) - 1)
+    return K.sum(s)
+
+  return loss
+
+
 
 class Regression:
 
@@ -53,6 +83,7 @@ class Regression:
     self.__input_dim = inputDim
 
     self.__model = None
+    self.__history = None
 
   def __del__(self):
 
@@ -60,23 +91,31 @@ class Regression:
     del self.__epochs
     del self.__input_dim
     del self.__model
+    del self.__history
 
   def build_model(self):
 
+    
+    #self.__model.add(Dense(12, input_dim=self.__input_dim, activation='sigmoid'))
+    #self.__model.add(Dense(6, activation='sigmoid'))
+    #self.__model.add(Dense(4, activation='sigmoid'))
+
     self.__model = Sequential()
     #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='softmax'))
-    self.__model.add(Dense(12, input_dim=self.__input_dim, activation='sigmoid'))
-    #self.__model.add(Dense(64, kernel_initializer='normal', bias_initializer='zeros', input_dim=self.__input_dim, activation='sigmoid'))
-    self.__model.add(Dropout(.2))
-    self.__model.add(Dense(6, activation='sigmoid'))
-    #self.__model.add(Dense(32, activation='sigmoid'))
-    #self.__model.add(Dropout(.5))
-    #self.__model.add(Dense(16, activation='sigmoid'))
-    #self.__model.add(Dropout(.5))
+    self.__model.add(Dense(12, kernel_initializer='normal', bias_initializer='zeros', \
+                            input_dim=self.__input_dim, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
+    self.__model.add(Dense(8, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
+    #self.__model.add(Dense(8, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
+    #self.__model.add(Dense(4, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
     self.__model.add(Dense(4, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
 
-    self.__model.add(Dense(1, activation='linear'))
-    #self.__model.add(Dense(1, activation='exponential'))
+    #self.__model.add(Dense(1, activation='linear'))
+    self.__model.add(Dense(1, activation='exponential'))
     #self.__model.add(Dense(1, activation='selu'))
     #self.__model.add(Dense(1, activation='elu'))
     #self.__model.add(Dense(1, input_dim=self.__input_dim, activation='linear'))
@@ -143,7 +182,8 @@ class Regression:
     df_test_events = pd.DataFrame(data=d)
     df_test_events.sort_values(by=['cycles'], ascending=True, inplace=True)
 
-    scaler = StandardScaler()
+    #scaler = StandardScaler()
+    scaler = MinMaxScaler(feature_range=(0, 1))
     X_train = scaler.fit_transform(df_train[parameters].values)
     y_train = np.asarray(df_train['RUL']).ravel()
     X_test = scaler.fit_transform(df_test[parameters].values)
@@ -166,61 +206,72 @@ class Regression:
 
     #print(df.head(n=5))
 
-  def fit(self, X, y, X_test, y_test, events):
+  def fit(self, X, y, X_test, y_test, events, name='RNN_NASA_Challenge', loss='mean_absolute_percentage_error'):
 
     self.build_model()
     self.__model.summary()
 
-    #self.__model.compile(optimizer='sgd', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
-    self.__model.compile(optimizer='rmsprop', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
+    self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+    #self.__model.compile(optimizer='rmsprop', loss=rul_loss(), metrics=['mae', 'acc'])
     #self.__model.compile(optimizer='sgd', loss=longitudinal_loss(events), metrics=['categorical_accuracy'])
-    history = self.__model.fit(X, y, \
+    self.__history = self.__model.fit(X, y, \
                     batch_size=self.__batch, epochs=self.__epochs, \
                     verbose=1, validation_data=(X_test, y_test))
     score = self.__model.evaluate(X_test, y_test, verbose=1)
-    print(score)
+
+    with open(DATA_DIR+'model/'+name+'_history.pkl', 'wb') as handler:
+      pickle.dump(self.__history.history, handler)
+    handler.close()
 
     #metric = Metrics()
     #y_hat_test = self.__model.predict(X_test)
     y_hat_train = self.__model.predict(X)
     y_hat_test = self.__model.predict(X_test)
-    #y_hat_test = y_hat_test[:,0]
-    #print(confusion_matrix(y_test, y_hat_test))
-    print(y_hat_train)
-    print(y_hat_train.mean())
-    print(y_hat_train.shape)
 
-    print(y_hat_test)
-    print(y_hat_test.mean())
-    print(y_hat_test.shape)
     #d = {}
-    #d['y_hat_test'] = y_hat_test
-    #d['y_test'] = y_test
-    #df = pd.DataFrame(data=d)
-    #df['rank'] = rankdata(y_hat_test)
-    #df.sort_values(by=['y_hat_test'], ascending=False, inplace=True)
-    #print(df.head(n=5))
-    #print(df.tail(n=5))
-    #for i in np.arange(0, self.__classes):
-    #  print("i= %d; AUROC= %.5lf" % (i, 1-metric.AUROC(y_test[:,i], y_hat_test[:,i])))
-    #del metric
+    #d['y'] = y_test.ravel()
+    #d['y_hat'] = y_hat_test.ravel()
 
-  def save(self):
+    #df = pd.DataFrame(data=d)
+    #df.to_csv(DATA_DIR+'model/'+name+'_y_test.csv', index=False)
+
+  def save(self, name='RNN_NASA_Challenge'):
 
     json_string = self.__model.to_json()
-    open('longitudinal_logistic_model.json', 'w').write(json_string)
+    handler = open(DATA_DIR+'model/'+name+'.json', 'w')
+    handler.write(json_string)
+    handler.close()
     yaml_string = self.__model.to_yaml()
-    open('longitudinal_logistic_model.yaml', 'w').write(yaml_string)
+    handler = open(DATA_DIR+'model/'+name+'.yaml', 'w')
+    handler.write(yaml_string)
+    handler.close()
+    self.__model.save_weights(DATA_DIR+'model/'+name+'.h5')
 
-    # save the weights in h5 format
-    self.__model.save_weights('longitudinal_logistic_wts.h5')
+  def test(self, X_test, y_test, name='RNN_NASA_Challenge', loss='mean_absolute_percentage_error'):
 
+    with open(DATA_DIR+'model/'+name+'.json', 'r') as handler:
+      json_string = handler.read()
+      self.__model = model_from_json(json_string)
+    handler.close()
+
+    self.__model.load_weights(DATA_DIR+'model/'+name+'.h5')
+    self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+    y_hat_test = self.__model.predict(X_test)
+
+    d = {}
+    d['y'] = y_test.ravel()
+    d['y_hat'] = y_hat_test.ravel()
+
+    df = pd.DataFrame(data=d)
+    df.to_csv(DATA_DIR+'model/'+name+'_y_test.csv', index=False)
+
+    
 
 
 class TestRegression(TestCase):                                                                                                         
   def setUp(self):
 
-    self.__reg = Regression(20, 500, 25)
+    self.__reg = Regression(20, 2, 25)
     
   def tearDown(self):
 
@@ -272,16 +323,16 @@ class TestRegression(TestCase):
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
-    (X_train, y_train, X_test, y_test, events_train, events_test) = \
-            self.__reg.load_nasa_challenge_data(train_file, test_file)
-    #input_dim = X_train.shape[1]
-    nb_classes = 2
-    
-    # convert class vectors to binary class matrices
-    #y_train = np_utils.to_categorical(y_train, nb_classes)
-    #y_test = np_utils.to_categorical(y_test, nb_classes)
+    #name = 'MLP_NASA_Challenge_RUL'
+    name = 'MLP_NASA_Challenge_RUL_loss_a_10_6'
 
-    self.__reg.fit(X_train, y_train, X_test, y_test, events_test)
+    reg = Regression(20, 100, 25)
+    (X_train, y_train, X_test, y_test, events_train, events_test) = \
+            reg.load_nasa_challenge_data(train_file, test_file)
+    reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_loss(a_1=10, a_2=6))
+    reg.save(name=name)
+    reg.test(X_test, y_test, name=name, loss=rul_loss(a_1=10, a_2=6))
+    del reg
 
 
 def suite():

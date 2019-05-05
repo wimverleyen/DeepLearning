@@ -26,7 +26,8 @@ import keras.backend as K
 DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
 #DATA_DIR = "/Users/UCRP556/data/Aviation/Challenge_Data/"
 
-def rul_loss(a_1=13, a_2=10):
+#def rul_loss(a_1=13, a_2=10):
+def rul_loss(a_1=10, a_2=6):
   """
     function closure:
     https://towardsdatascience.com/advanced-keras-constructing-complex-custom-losses-and-metrics-c07ca130a618
@@ -49,10 +50,6 @@ def rul_loss(a_1=13, a_2=10):
     """
 
     s = tf.where(d < 0,  tf.exp(-(d/float(a_1))) -1, tf.exp(d/float(a_2)) - 1)
-
-    #return K.mean(K.square(y_pred - y_true), K.square(layer), axis=-1)
-    #print(confusion_matrix(y_true, y_pred))
-    #return K.mean(K.square(y_pred - y_true))
     return K.sum(s)
 
   return loss
@@ -77,6 +74,7 @@ class RNN:
     del self.__input_dim
     del self.__window
     del self.__model
+    del self.__history
 
   def build_model_random(self):
 
@@ -89,7 +87,8 @@ class RNN:
     self.__model.add(Dropout(0.2))
 
     self.__model.add(Dense(output_dim=1))
-    self.__model.model.add(Activation("linear")) 
+    #self.__model.model.add(Activation("linear")) 
+    self.__model.model.add(Activation("exponential")) 
 
   def build_model(self):
 
@@ -194,9 +193,6 @@ class RNN:
     X_test = scaler.fit_transform(df_test[parameters].values)
     y_test = np.asarray(df_test['RUL']).ravel()
 
-    print(y_train.shape)
-    print(y_test.shape)
-
     n = X_train.shape[0]
     
     X_train_seq = []
@@ -220,32 +216,21 @@ class RNN:
     X_test_seq = np.array(X_test_seq)
     y_test_seq = np.array(y_test_seq)
 
-    print(X_train_seq.shape)
-    print(y_train_seq.shape)
-    print(X_test_seq.shape)
-    print(y_test_seq.shape)
-
     return X_train_seq, y_train_seq, X_test_seq, y_test_seq, df_train_events, df_test_events
 
-  def series_to_supervised(self):
-    pass
+  def fit(self, X, y, X_test, y_test, name='RNN_NASA_Challenge', loss='mean_absolute_percentage_error'):
 
-
-  def fit(self, X, y, X_test, y_test, name='RNN_NASA_Challenge'):
-
-    #self.build_model([1, sequence_length, int(sequence_length*2), int(sequence_length*4), 1])
     self.build_model()
     self.__model.summary()
 
     #self.__model.compile(optimizer='sgd', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
-    #self.__model.compile(optimizer='rmsprop', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
-    self.__model.compile(optimizer='rmsprop', loss=rul_loss(), metrics=['mae', 'acc'])
+    self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+    #self.__model.compile(optimizer='rmsprop', loss=rul_loss(), metrics=['mae', 'acc'])
     #self.__model.compile(optimizer='sgd', loss=longitudinal_loss(events), metrics=['categorical_accuracy'])
     self.__history = self.__model.fit(X, y, \
                     batch_size=self.__batch, epochs=self.__epochs, \
                     verbose=1, validation_data=(X_test, y_test))
     score = self.__model.evaluate(X_test, y_test, verbose=1)
-    print(score)
 
     with open(DATA_DIR+'model/'+name+'_history.pkl', 'wb') as handler:
       pickle.dump(self.__history.history, handler)
@@ -255,16 +240,6 @@ class RNN:
     #y_hat_test = self.__model.predict(X_test)
     y_hat_train = self.__model.predict(X)
     y_hat_test = self.__model.predict(X_test)
-
-    #y_hat_test = y_hat_test[:,0]
-    #print(confusion_matrix(y_test, y_hat_test))
-    print(y_hat_train)
-    print(y_hat_train.mean())
-    print(y_hat_train.shape)
-
-    print(y_hat_test)
-    print(y_hat_test.mean())
-    print(y_hat_test.shape)
 
   def fit_random(self, X, y, X_test, y_test):
 
@@ -277,22 +252,11 @@ class RNN:
                     batch_size=self.__batch, epochs=self.__epochs, \
                     verbose=1, validation_data=(X_test, y_test))
     score = self.__model.evaluate(X_test, y_test, verbose=1)
-    print(score)
 
     #metric = Metrics()
     #y_hat_test = self.__model.predict(X_test)
     y_hat_train = self.__model.predict(X)
     y_hat_test = self.__model.predict(X_test)
-
-    #y_hat_test = y_hat_test[:,0]
-    #print(confusion_matrix(y_test, y_hat_test))
-    print(y_hat_train)
-    print(y_hat_train.mean())
-    print(y_hat_train.shape)
-
-    print(y_hat_test)
-    print(y_hat_test.mean())
-    print(y_hat_test.shape)
 
   def save(self, name='RNN_NASA_Challenge'):
 
@@ -306,7 +270,7 @@ class RNN:
     handler.close()
     self.__model.save_weights(DATA_DIR+'model/'+name+'.h5')
 
-  def test(self, X_test, y_test, name='RNN_NASA_Challenge'):
+  def test(self, X_test, y_test, name='RNN_NASA_Challenge', loss='mean_absolute_percentage_error'):
 
     with open(DATA_DIR+'model/'+name+'.json', 'r') as handler:
       json_string = handler.read()
@@ -314,7 +278,7 @@ class RNN:
     handler.close()
 
     self.__model.load_weights(DATA_DIR+'model/'+name+'.h5')
-    self.__model.compile(optimizer='rmsprop', loss='mean_absolute_percentage_error', metrics=['mae', 'acc'])
+    self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
     print(X_test.shape)
     y_hat_test = self.__model.predict(X_test)
 
@@ -397,9 +361,10 @@ class TestRNN(TestCase):
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
-    name = 'RNN_NASA_Challenge_RUL_loss'
+    #name = 'RNN_NASA_Challenge_RUL_loss_a_10_6_exp'
+    name = 'RNN_NASA_Challenge_RUL'
 
-    rnn = RNN(20, 80, 25, 75)
+    rnn = RNN(20, 100, 25, 75)
     (X_train, y_train, X_test, y_test, events_train, events_test) = \
             rnn.load_nasa_challenge_data(train_file, test_file)
     rnn.fit(X_train, y_train, X_test, y_test, name=name)
