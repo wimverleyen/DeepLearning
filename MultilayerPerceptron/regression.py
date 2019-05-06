@@ -68,7 +68,7 @@ def rul_lin_loss(a_1=50, a_2=100):
     s[ix] = dmax[ix]
     """
 
-    s = tf.where(d < 0,  tf.math.multiply(d, a_1), tf.math.multiply(d, a_2))
+    s = tf.where(d < 0, tf.math.multiply(-d, a_1), tf.math.multiply(d, a_2))
     return K.sum(s)
 
   return loss
@@ -240,8 +240,8 @@ class Regression:
     self.build_model()
     self.__model.summary()
 
-    #self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
-    self.__model.compile(optimizer='sgd', loss=loss, metrics=['mae', 'acc'])
+    self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+    #self.__model.compile(optimizer='sgd', loss=loss, metrics=['mae', 'acc'])
     #self.__model.compile(optimizer='rmsprop', loss=rul_loss(), metrics=['mae', 'acc'])
     #self.__model.compile(optimizer='sgd', loss=longitudinal_loss(events), metrics=['categorical_accuracy'])
     self.__history = self.__model.fit(X, y, \
@@ -285,8 +285,8 @@ class Regression:
     handler.close()
 
     self.__model.load_weights(DATA_DIR+'model/'+name+'.h5')
-    #self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
-    self.__model.compile(optimizer='sgd', loss=loss, metrics=['mae', 'acc'])
+    self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+    #self.__model.compile(optimizer='sgd', loss=loss, metrics=['mae', 'acc'])
     y_hat_test = self.__model.predict(X_test)
 
     d = {}
