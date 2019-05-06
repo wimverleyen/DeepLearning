@@ -252,6 +252,16 @@ class Metrics:
     d = y_hat - y
     (s, score) = self.RUL_score(y, y_hat)
 
+    dd={}
+    dd['y'] = y
+    dd['y_hat'] = y_hat
+    dd['error'] = d 
+    df = pd.DataFrame(data=dd)
+    df.sort_values(by=['error'], inplace=True, ascending=False)
+    df_test = df[df['error'] > 0]
+    q_late = df_test.shape[0]
+    print(q_late)
+
     fig = plt.figure()
 
     fig.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, hspace=0.6, wspace=0.4)
@@ -292,10 +302,8 @@ class Metrics:
 
     add_plot = fig.add_subplot(1, 2, 2)
 
-    identity = np.arange(0, 1.1, 0.1)
-    #add_plot.plot(identity, identity, color='0.5', linewidth=.5)
-    #add_plot.plot(y, d, color='forestgreen', linewidth=.75)
-    add_plot.scatter(y, d, color='dodgerblue', s=.1, alpha=.7)
+    #add_plot.scatter(y, d, color='dodgerblue', s=.1, alpha=.7)
+    add_plot.scatter(df['y'].values, df['error'].values, color='dodgerblue', s=.1, alpha=.7)
    
     for tick in add_plot.xaxis.get_major_ticks():
       tick.label.set_fontsize(8)
@@ -306,10 +314,13 @@ class Metrics:
       tick.label.set_fontsize(8)
     label = "Error"
     add_plot.set_ylabel(label, fontsize=10)
+    title = "# late = %d" % q_late
+    add_plot.set_title(title, fontsize=10)
     add_plot.set_aspect(1./add_plot.get_data_ratio())
     add_plot.grid(True)
     
     figname = FIG_DIR +name+".png"
+    print(figname)
     fig.savefig(figname, format="png", dpi=300)
 
     del fig
@@ -445,12 +456,13 @@ class TestMetrics(TestCase):
     self.__metric.plot_learning('RNN_NASA_Challenge_RUL_loss_history.pkl', name=name)
     """
 
-    ame = 'MLP_NASA_Challenge_RUL_lin_loss_a_50_200'
+    #name = 'MLP_NASA_Challenge_RUL_lin_loss_a_50_200'
+    name = 'RNN_NASA_Challenge_RUL_loss_a_10_6'
     DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
     filename = DATA_DIR+'model/'+name+'_y_test.csv'
     df = pd.read_csv(filename)
 
-    self.__metric.plot_RUL(df['y'].values, df['y_hat'].values, name=name+'_direct')
+    self.__metric.plot_RUL(df['y'].values, df['y_hat'].values, name=name)
     #self.__metric.plot_learning('RNN_NASA_Challenge_RUL_loss_history.pkl', name=name) 
 
     #name = 'MLP_NASA_Challenge_RUL_loss'
