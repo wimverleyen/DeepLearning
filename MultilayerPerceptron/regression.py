@@ -23,8 +23,9 @@ import keras.backend as K
 
 #from performance.metrics import Metrics
 
-DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
-#DATA_DIR = "/Users/UCRP556/code/networks/data/NASA/Challenge_Data/"
+#DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
+DATA_DIR = "/Users/UCRP556/data/aviation/NASA/Challenge_Data/"
+
 
 #def longitudinal_loss(ts, events, epsilon=.001):
 def longitudinal_loss(events, epsilon=.001):
@@ -41,6 +42,34 @@ def longitudinal_loss(events, epsilon=.001):
     #return K.mean(K.square(y_pred - y_true), K.square(layer), axis=-1)
     #print(confusion_matrix(y_true, y_pred))
     return K.mean(K.square(y_pred - y_true))
+
+  return loss
+
+
+def rul_lin_loss(a_1=50, a_2=100):
+  """
+    function closure:
+    https://towardsdatascience.com/advanced-keras-constructing-complex-custom-losses-and-metrics-c07ca130a618
+  """
+
+
+  def loss(y_true, y_pred):
+
+    d = y_pred - y_true
+    """
+    dmin = tf.exp(-(d/float(a_1))) -1
+    dmax = tf.exp(d/float(a_2)) - 1
+    s = tf.zeros_like(d)
+    flags = tf.math.greater(d, s)
+    ix = tf.to_int32(tf.where(flags))
+    s[ix] = dmin[ix]
+    flags = tf.math.less(d, tf.zeros_like(d))
+    ix = tf.to_int32(tf.where(flags))
+    s[ix] = dmax[ix]
+    """
+
+    s = tf.where(d < 0,  tf.math.multiply(d, a_1), tf.math.multiply(d, a_2))
+    return K.sum(s)
 
   return loss
 
@@ -211,7 +240,8 @@ class Regression:
     self.build_model()
     self.__model.summary()
 
-    self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+    #self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+    self.__model.compile(optimizer='sgd', loss=loss, metrics=['mae', 'acc'])
     #self.__model.compile(optimizer='rmsprop', loss=rul_loss(), metrics=['mae', 'acc'])
     #self.__model.compile(optimizer='sgd', loss=longitudinal_loss(events), metrics=['categorical_accuracy'])
     self.__history = self.__model.fit(X, y, \
@@ -255,7 +285,8 @@ class Regression:
     handler.close()
 
     self.__model.load_weights(DATA_DIR+'model/'+name+'.h5')
-    self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+    #self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+    self.__model.compile(optimizer='sgd', loss=loss, metrics=['mae', 'acc'])
     y_hat_test = self.__model.predict(X_test)
 
     d = {}
@@ -322,16 +353,28 @@ class TestRegression(TestCase):
 
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
+    name = 'MLP_NASA_Challenge_RUL_loss_a_7_5'
 
-    #name = 'MLP_NASA_Challenge_RUL'
-    name = 'MLP_NASA_Challenge_RUL_loss_a_10_6'
+    #reg = Regression(20, 100, 25)
+    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
+    #        reg.load_nasa_challenge_data(train_file, test_file)
+    #reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_loss(a_1=8, a_2=5))
+    #reg.save(name=name)
+    #reg.test(X_test, y_test, name=name, loss=rul_loss(a_1=8, a_2=5))
+    #del reg
+
+  def testCNASAChallenge(self):
+
+    train_file = DATA_DIR+'train.txt'
+    test_file = DATA_DIR+'test.txt'
+    name = 'MLP_NASA_Challenge_RUL_lin_loss_a_50_100'
 
     reg = Regression(20, 100, 25)
     (X_train, y_train, X_test, y_test, events_train, events_test) = \
             reg.load_nasa_challenge_data(train_file, test_file)
-    reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_loss(a_1=10, a_2=6))
+    reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_lin_loss(a_1=50, a_2=100))
     reg.save(name=name)
-    reg.test(X_test, y_test, name=name, loss=rul_loss(a_1=10, a_2=6))
+    reg.test(X_test, y_test, name=name, loss=rul_lin_loss(a_1=50, a_2=100))
     del reg
 
 
