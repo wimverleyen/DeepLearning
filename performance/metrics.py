@@ -445,12 +445,12 @@ class TestMetrics(TestCase):
     self.__metric.plot_learning('RNN_NASA_Challenge_RUL_loss_history.pkl', name=name)
     """
 
-    name = 'RNN_NASA_Challenge_RUL_loss_a_10_6_exp'
+    ame = 'MLP_NASA_Challenge_RUL_lin_loss_a_50_200'
     DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
     filename = DATA_DIR+'model/'+name+'_y_test.csv'
     df = pd.read_csv(filename)
 
-    #self.__metric.plot_RUL(df['y'].values, df['y_hat'].values, name=name+'_direct')
+    self.__metric.plot_RUL(df['y'].values, df['y_hat'].values, name=name+'_direct')
     #self.__metric.plot_learning('RNN_NASA_Challenge_RUL_loss_history.pkl', name=name) 
 
     #name = 'MLP_NASA_Challenge_RUL_loss'
@@ -487,8 +487,9 @@ class TestMetrics(TestCase):
 
   def testCLossRUL(self): 
 
-    self.__metric.plot_loss_function()
-    self.__metric.plot_lin_loss_function()
+    #self.__metric.plot_loss_function()
+    #self.__metric.plot_lin_loss_function()
+    pass
 
 
 def suite():
