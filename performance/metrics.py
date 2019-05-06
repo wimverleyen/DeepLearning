@@ -195,7 +195,7 @@ class Metrics:
 
     return s, s.sum()
 
-  def plot_RUL(self, y, y_hat, name='RNN_NASA_Challenge', a_1=13, a_2=10, a_1_loss=8, a2_loss=5):
+  def plot_RUL(self, y, y_hat, name='RNN_NASA_Challenge', a_1=13, a_2=10, a_1_loss=8, a_2_loss=5):
 
     d = y_hat - y
     (s, score) = self.RUL_score(y, y_hat)
