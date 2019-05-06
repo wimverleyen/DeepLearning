@@ -195,7 +195,7 @@ class Metrics:
 
     return s, s.sum()
 
-  def plot_RUL(self, y, y_hat, name='RNN_NASA_Challenge', a_1=13, a_2=10):
+  def plot_RUL(self, y, y_hat, name='RNN_NASA_Challenge', a_1=13, a_2=10, a_1_loss=8, a2_loss=5):
 
     d = y_hat - y
     (s, score) = self.RUL_score(y, y_hat)
@@ -212,12 +212,9 @@ class Metrics:
     dmax = np.expm1(ref_2/float(a_2))
 
     ref_3 = np.linspace(0, -50, 100)
-    lmin = np.expm1(-(ref_1/float(10)))
+    lmin = np.expm1(-(ref_1/float(a_1_loss)))
     ref_4 = np.linspace(0, 50, 100)
-    lmax = np.expm1(ref_2/float(6))
-
-    #print(ref)
-    #print(dmax)
+    lmax = np.expm1(ref_2/float(a_2_loss))
 
     add_plot.plot(ref_1, dmin, color='indianred', linewidth=.75)
     add_plot.plot(ref_2, dmax, color='indianred', linewidth=.75, label='RUL score')
