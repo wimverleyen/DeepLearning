@@ -367,14 +367,14 @@ class TestRegression(TestCase):
 
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
-    name = 'MLP_NASA_Challenge_RUL_lin_loss_a_50_100'
+    name = 'MLP_NASA_Challenge_RUL_lin_loss_a_50_600'
 
     reg = Regression(20, 100, 25)
     (X_train, y_train, X_test, y_test, events_train, events_test) = \
             reg.load_nasa_challenge_data(train_file, test_file)
-    reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_lin_loss(a_1=50, a_2=100))
+    reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_lin_loss(a_1=50, a_2=600))
     reg.save(name=name)
-    reg.test(X_test, y_test, name=name, loss=rul_lin_loss(a_1=50, a_2=100))
+    reg.test(X_test, y_test, name=name, loss=rul_lin_loss(a_1=50, a_2=600))
     del reg
 
 
