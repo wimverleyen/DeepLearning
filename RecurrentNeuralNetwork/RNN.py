@@ -26,6 +26,35 @@ import keras.backend as K
 DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
 #DATA_DIR = "/Users/UCRP556/data/Aviation/Challenge_Data/"
 
+
+def rul_lin_loss(a_1=50, a_2=100):
+  """
+    function closure:
+    https://towardsdatascience.com/advanced-keras-constructing-complex-custom-losses-and-metrics-c07ca130a618
+  """
+
+
+  def loss(y_true, y_pred):
+
+    d = y_pred - y_true
+    """
+    dmin = tf.exp(-(d/float(a_1))) -1
+    dmax = tf.exp(d/float(a_2)) - 1
+    s = tf.zeros_like(d)
+    flags = tf.math.greater(d, s)
+    ix = tf.to_int32(tf.where(flags))
+    s[ix] = dmin[ix]
+    flags = tf.math.less(d, tf.zeros_like(d))
+    ix = tf.to_int32(tf.where(flags))
+    s[ix] = dmax[ix]
+    """
+
+    s = tf.where(d < 0, tf.math.multiply(-d, a_1), tf.math.multiply(d, a_2))
+    return K.sum(s)
+
+  return loss
+
+
 #def rul_loss(a_1=13, a_2=10):
 def rul_loss(a_1=10, a_2=6):
   """
@@ -186,7 +215,6 @@ class RNN:
     df_test_events = pd.DataFrame(data=d)
     df_test_events.sort_values(by=['cycles'], ascending=True, inplace=True)
 
-    #scaler = StandardScaler()
     scaler = MinMaxScaler(feature_range=(0, 1))
     X_train = scaler.fit_transform(df_train[parameters].values)
     y_train = np.asarray(df_train['RUL']).ravel()
@@ -361,18 +389,34 @@ class TestRNN(TestCase):
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
-    #name = 'RNN_NASA_Challenge_RUL_loss_a_10_6_exp'
     name = 'RNN_NASA_Challenge_RUL'
 
+    #rnn = RNN(20, 100, 25, 75)
+    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
+    #        rnn.load_nasa_challenge_data(train_file, test_file)
+    #rnn.fit(X_train, y_train, X_test, y_test, name=name)
+    #rnn.save(name=name)
+    #rnn.test(X_test, y_test, name=name)
+    #del rnn
+
+  def testDNASAChallenge(self): 
+
+    train_file = DATA_DIR+'train.txt'
+    test_file = DATA_DIR+'test.txt'
+
+    name = 'rnn_nasa_challenge_rul_lin_loss_a_50_100'
+
     rnn = RNN(20, 100, 25, 75)
-    (X_train, y_train, X_test, y_test, events_train, events_test) = \
+    (x_train, y_train, x_test, y_test, events_train, events_test) = \
             rnn.load_nasa_challenge_data(train_file, test_file)
-    rnn.fit(X_train, y_train, X_test, y_test, name=name)
+    rnn.fit(x_train, y_train, x_test, y_test, name=name, loss=rul_lin_loss(a_1=50, a_2=100))
     rnn.save(name=name)
-    rnn.test(X_test, y_test, name=name)
+    rnn.test(x_test, y_test, name=name, loss=rul_lin_loss(a_1=50, a_2=100))
     del rnn
 
-  def testDRandom(self):
+    
+
+  def testERandom(self):
 
     #rnn = RNN(20, 10, 2, 75)
     #(X_train, y_train, X_test, y_test) = rnn.load_random_data()
