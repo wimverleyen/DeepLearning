@@ -179,6 +179,74 @@ class Metrics:
 
     del fig
 
+  def plot_power_loss_function(self, a_1_pow=2, a_2_pow=3, a_1_lin=50, a_2_lin=100, \
+                                a_1=13, a_2=10, name='RNN_NASA_Challenge'):
+
+    fig = plt.figure()
+
+    fig.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, hspace=0.6, wspace=0.4)
+
+    add_plot = fig.add_subplot(1, 1, 1)
+  
+    ref_1 = np.linspace(0, -50, 100)
+    dmin = np.expm1(-(ref_1/float(a_1)))
+    ref_2 = np.linspace(0, 50, 100)
+    dmax = np.expm1(ref_2/float(a_2))
+
+    ref_3 = np.linspace(0, -50, 100)
+    lmin = np.expm1(-(ref_1/float(10)))
+    ref_4 = np.linspace(0, 50, 100)
+    lmax = np.expm1(ref_2/float(6))
+
+    ref_5 = np.linspace(0, -50, 100)
+    llmin = -np.multiply(ref_5, a_1_lin)
+    ref_6 = np.linspace(0, 50, 100)
+    llmax = np.multiply(ref_6, a_2_lin)
+
+    ref_7 = np.linspace(0, -50, 100)
+    plmin = np.power(ref_7, a_1_pow)
+    ref_8 = np.linspace(0, 20, 40)
+    plmax = np.power(ref_8, a_2_pow)
+
+
+    #add_plot.semilogy(ref_1, dmin, color='indianred', linewidth=.75, label='RUL_score')
+    #add_plot.semilogy(ref_2, dmax, color='indianred', linewidth=.75)
+    add_plot.plot(ref_1, dmin, color='indianred', linewidth=.75)
+    add_plot.plot(ref_2, dmax, color='indianred', linewidth=.75, label='RUL score')
+  
+    #add_plot.semilogy(ref_3, lmin, color='indianred', linewidth=.75, label='exponential')
+    #add_plot.semilogy(ref_4, lmax, color='indianred', linewidth=.75)
+    add_plot.plot(ref_3, lmin, color='black', linewidth=.75, label='exponential')
+    add_plot.plot(ref_4, lmax, color='black', linewidth=.75)
+
+    #add_plot.semilogy(ref_5, lmin, color='dodgerblue', linewidth=.75, label='linear')
+    #add_plot.semilogy(ref_6, lmax, color='dodgerblue', linewidth=.75)
+    add_plot.plot(ref_5, llmin, color='dodgerblue', linewidth=.75, label='linear')
+    add_plot.plot(ref_6, llmax, color='dodgerblue', linewidth=.75)
+
+    #add_plot.semilogy(ref_5, lmin, color='darkorange', linewidth=.75, label='power')
+    #add_plot.semilogy(ref_6, lmax, color='darkorange', linewidth=.75)
+    add_plot.plot(ref_7, plmin, color='darkorange', linewidth=.75, label='power')
+    add_plot.plot(ref_8, plmax, color='darkorange', linewidth=.75)
+
+    for tick in add_plot.xaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "Error"
+    add_plot.set_xlabel(label, fontsize=10)
+
+    for tick in add_plot.yaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "RUL score"
+    add_plot.set_ylabel(label, fontsize=10)
+    add_plot.set_aspect(1./add_plot.get_data_ratio())
+    add_plot.legend(fontsize=8)
+    add_plot.grid(True)    
+
+    figname = FIG_DIR +name+"_power_loss_function.png"
+    fig.savefig(figname, format="png", dpi=300)
+
+    del fig 
+
   def plot_lin_loss_function(self, a_1_lin=50, a_2_lin=100, a_1=13, a_2=10, name='RNN_NASA_Challenge'):
 
     fig = plt.figure()
@@ -501,6 +569,7 @@ class TestMetrics(TestCase):
 
     #self.__metric.plot_loss_function()
     #self.__metric.plot_lin_loss_function()
+    self.__metric.plot_power_loss_function()
     pass
 
 
