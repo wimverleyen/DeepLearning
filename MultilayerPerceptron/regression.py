@@ -220,7 +220,7 @@ class Regression:
 
     return X_train, y_train, X_test, y_test, df_train_events, df_test_events
 
-  def load_data(self, data, events):
+  def load_data(self, data, events)
 
     #print(data)
     parameters = ['TAT', 'EGT', 'N2']
@@ -376,6 +376,7 @@ class TestRegression(TestCase):
     reg.save(name=name)
     reg.test(X_test, y_test, name=name, loss=rul_lin_loss(a_1=50, a_2=600))
     del reg
+
 
 
 def suite():
