@@ -18,13 +18,49 @@ from sklearn.metrics import confusion_matrix
 from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Activation, Dropout
 from keras.datasets import mnist
-from keras.utils import np_utils
+from keras.utils import Sequence, np_utils
 import keras.backend as K
 
+#from tensorflow.python.keras.utils import Sequence
 #from performance.metrics import Metrics
 
 DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
 #DATA_DIR = "/Users/UCRP556/data/aviation/NASA/Challenge_Data/"
+
+
+class RULGenerator(Sequence):
+
+  def __init__(self, X, y, ts=100):
+    self.__X, self.__y = X, y
+    self.__ts = ts
+
+    batch_fixed = self.__y[self.__y <= ts]
+
+    self.__batch_size = 3.0*(batch_fixed.shape[0])
+
+  def __len__(self):
+    #return int(np.ceil(len(self.__X) / float(self.__batch_size)))
+    return 500 
+
+  def __getitem__(self, idx):
+
+    ix = np.where(self.__y>self.__ts)[0]
+    iy = np.where(self.__y<=self.__ts)[0]
+
+    Xx = self.__X[ix]
+    RULx = self.__y[ix]
+    Xy = self.__X[iy]
+    RULy = self.__y[iy]
+
+    ix_batch = np.random.permutation(np.arange(RULx.shape[0]))
+    ix_batch = ix_batch[:(RULy.shape[0]*2)]
+
+    Xx_batch = Xx[ix_batch]
+    RULx_batch = RULx[ix_batch]
+    X_batch = np.concatenate((Xx_batch, Xy), axis=0)
+    RUL_batch = np.concatenate((RULx_batch, RULy), axis=0)
+    return X_batch, RUL_batch
+
 
 
 #def longitudinal_loss(ts, events, epsilon=.001):
@@ -101,6 +137,40 @@ def rul_loss(a_1=10, a_2=6):
 
   return loss
 
+def RUL_batch(data, RUL, ts):
+  
+  ix = np.where(RUL>ts)[0]
+  iy = np.where(RUL<=ts)[0]
+
+  print(iy.shape)
+
+  Xx = data[ix]
+  RULx = RUL[ix]
+  Xy = data[iy]
+  RULy = RUL[iy]
+
+  batch_size = 3*(RULy.shape[0])
+  num_batches_per_epoch = int((len(data) - 1) / batch_size) + 1
+  print('batch/epoch', num_batches_per_epoch)
+
+  def RUL_generator():
+    i = 0
+    while True:
+      
+      for batch_num in range(num_batches_per_epoch):
+        print(batch_num)
+        ix_batch = np.random.permutation(np.arange(RULx.shape[0]))
+        # danger
+        ix_batch = ix_batch[:(RULy.shape[0]*2)]
+        Xx_batch = Xx[ix_batch]
+        RULx_batch = RULx[ix]
+        X_batch = np.concatenate((Xx_batch, Xy), axis=0)
+        RUL_batch = np.concatenate((RULx_batch, RULy), axis=0)
+        print(RUL_batch.shape)
+        yield X_batch, RUL_batch
+      break
+        
+  return num_batches_per_epoch, RUL_generator()
 
 
 class Regression:
@@ -153,7 +223,7 @@ class Regression:
     #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='elu'))
     #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='selu'))
 
-  def load_nasa_challenge_data(self, train_file, test_file, train_gap=20):
+  def load_nasa_challenge_data(self, train_file, test_file, train_gap=20, dev_file=''):
 
     columns = ['device_id', 'cycles', 'setting1', 'setting2', 'setting3']
     sensors = ['sensor'+str(i+1) for i in np.arange(0, 23)]
@@ -175,6 +245,16 @@ class Regression:
     df_test.loc[df_test['rank'] <= train_gap, ['Y']] = 1
     df_test['RUL'] = np.zeros(df_test.shape[0])
 
+    if len(dev_file) > 0:
+
+      df_dev = pd.read_csv(dev_file, sep=' ', header=None)
+      df_dev.columns = columns
+      df_dev.dropna(axis=1, inplace=True)
+      df_dev['rank'] = df_dev.groupby('device_id')['cycles'].rank(ascending=False)
+      df_dev['Y'] = np.zeros(df_dev.shape[0])
+      df_dev.loc[df_dev['rank'] <= train_gap, ['Y']] = 1
+      df_dev['RUL'] = np.zeros(df_dev.shape[0])
+
     for dev_id in df_train['device_id'].unique():
       df_train.loc[df_train['device_id'] == dev_id, ['RUL']] = \
             df_train['cycles'].max() - df_train['cycles']
@@ -183,6 +263,11 @@ class Regression:
       df_test.loc[df_test['device_id'] == dev_id, ['RUL']] = \
             df_test['cycles'].max() - df_test['cycles']
 
+    if len(dev_file) > 0:
+      for dev_id in df_dev['device_id'].unique():
+        df_dev.loc[df_dev['device_id'] == dev_id, ['RUL']] = \
+            df_dev['cycles'].max() - df_dev['cycles']
+
     parameters = ['cycles', 'setting1', 'setting2', 'setting3']
     #parameters = ['setting1', 'setting2', 'setting3']
     sensors = ['sensor'+str(i+1) for i in np.arange(0, 21)]
@@ -190,6 +275,8 @@ class Regression:
 
     df_train.sort_values(by=['cycles'], ascending=True, inplace=True)
     df_test.sort_values(by=['cycles'], ascending=True, inplace=True)
+    if len(dev_file) > 0:
+      df_dev.sort_values(by=['cycles'], ascending=True, inplace=True)
 
     d = {}
     d['device_id'] = []
@@ -211,14 +298,31 @@ class Regression:
     df_test_events = pd.DataFrame(data=d)
     df_test_events.sort_values(by=['cycles'], ascending=True, inplace=True)
 
+    if len(dev_file) > 0:
+      d = {}
+      d['device_id'] = []
+      d['cycles'] = []
+      for dev_id in df_dev['device_id'].unique():
+        d['device_id'].append(dev_id)
+        d['cycles'].append(df_dev[df_dev['device_id'] == dev_id]['cycles'].max())
+
+      df_dev_events = pd.DataFrame(data=d)
+      df_dev_events.sort_values(by=['cycles'], ascending=True, inplace=True)
+
     #scaler = StandardScaler()
     scaler = MinMaxScaler(feature_range=(0, 1))
     X_train = scaler.fit_transform(df_train[parameters].values)
     y_train = np.asarray(df_train['RUL']).ravel()
     X_test = scaler.fit_transform(df_test[parameters].values)
     y_test = np.asarray(df_test['RUL']).ravel()
+    if len(dev_file) > 0:
+      X_dev = scaler.fit_transform(df_dev[parameters].values)
+      y_dev = np.asarray(df_dev['RUL']).ravel()
 
-    return X_train, y_train, X_test, y_test, df_train_events, df_test_events
+    if len(dev_file) > 0:
+      return X_train, y_train, X_test, y_test, df_train_events, df_test_events, X_dev, y_dev
+    else:
+      return X_train, y_train, X_test, y_test, df_train_events, df_test_events
 
   def load_data(self, data, events):
 
@@ -265,6 +369,24 @@ class Regression:
     #df = pd.DataFrame(data=d)
     #df.to_csv(DATA_DIR+'model/'+name+'_y_test.csv', index=False)
 
+  def fit_generator(self, X, y, X_test, y_test, events, name='RNN_NASA_Challenge', \
+                    loss='mean_absolute_percentage_error', split=100):
+
+    self.build_model()
+    self.__model.summary()
+
+    self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
+
+    self.__history = self.__model.fit_generator(RULGenerator(X, y), epochs=self.__epochs, \
+                            validation_data=(X_test, y_test))
+                            
+    score = self.__model.evaluate(X_test, y_test, verbose=1)
+    print("Model score: ", score)
+
+    with open(DATA_DIR+'model/'+name+'_history.pkl', 'wb') as handler:
+      pickle.dump(self.__history.history, handler)
+    handler.close()
+
   def save(self, name='RNN_NASA_Challenge'):
 
     json_string = self.__model.to_json()
@@ -277,7 +399,7 @@ class Regression:
     handler.close()
     self.__model.save_weights(DATA_DIR+'model/'+name+'.h5')
 
-  def test(self, X_test, y_test, name='RNN_NASA_Challenge', loss='mean_absolute_percentage_error'):
+  def test(self, X_test, y_test, name='RNN_NASA_Challenge', loss='mean_absolute_percentage_error', test='test'):
 
     with open(DATA_DIR+'model/'+name+'.json', 'r') as handler:
       json_string = handler.read()
@@ -294,7 +416,7 @@ class Regression:
     d['y_hat'] = y_hat_test.ravel()
 
     df = pd.DataFrame(data=d)
-    df.to_csv(DATA_DIR+'model/'+name+'_y_test.csv', index=False)
+    df.to_csv(DATA_DIR+'model/'+name+'_y_'+test+'.csv', index=False)
 
     
 
@@ -302,7 +424,7 @@ class Regression:
 class TestRegression(TestCase):                                                                                                         
   def setUp(self):
 
-    self.__reg = Regression(20, 2, 25)
+    self.__reg = Regression(20, 500, 25)
     
   def tearDown(self):
 
@@ -383,12 +505,30 @@ class TestRegression(TestCase):
     test_file = DATA_DIR+'test.txt'
     name = 'MLP_NASA_Challenge_RUL_power_loss_a_2_3'
 
-    reg = Regression(20, 100, 25)
-    (X_train, y_train, X_test, y_test, events_train, events_test) = \
-            reg.load_nasa_challenge_data(train_file, test_file)
-    reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_lin_loss(a_1=2, a_2=3))
+    #reg = Regression(20, 100, 25)
+    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
+    #        reg.load_nasa_challenge_data(train_file, test_file)
+    #reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_power_loss(a_1=2, a_2=3))
+    #reg.save(name=name)
+    #reg.test(X_test, y_test, name=name, loss=rul_power_loss(a_1=2, a_2=3))
+    #del reg
+
+  def testENASAChallenge(self):
+
+    train_file = DATA_DIR+'train.txt'
+    test_file = DATA_DIR+'test.txt'
+    dev_file = DATA_DIR+'final_test.txt'
+    name = 'MLP_NASA_Challenge_RUL_sample_power_loss_a_2_4'
+
+    reg = Regression(20, 500, 25)
+    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
+    #        reg.load_nasa_challenge_data(train_file, test_file)
+    (X_train, y_train, X_test, y_test, events_train, events_test, X_dev, y_dev) = \
+            reg.load_nasa_challenge_data(train_file, test_file, dev_file=dev_file)
+    reg.fit_generator(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_power_loss(a_1=2, a_2=4))
     reg.save(name=name)
-    reg.test(X_test, y_test, name=name, loss=rul_lin_loss(a_1=50, a_2=600))
+    reg.test(X_test, y_test, name=name, loss=rul_power_loss(a_1=2, a_2=4))
+    reg.test(X_dev, y_dev, name=name, loss=rul_power_loss(a_1=2, a_2=4), test='dev')
     del reg
 
 
