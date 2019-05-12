@@ -17,6 +17,8 @@ sns.set(style="white", palette="muted")
 import os
 from scipy.stats import rankdata
 
+from MultilayerPerceptron.regression import Regression
+
 
 DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
 FIG_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/figures/"
@@ -461,6 +463,65 @@ class Metrics:
     del fig
 
 
+  def plot_RUL_sample(self, y, y_test, y_dev, name='NASA_Challenge_RUL_distro'):
+
+    fig = plt.figure()
+
+    fig.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, hspace=0.6, wspace=0.4)
+
+    add_plot = fig.add_subplot(1, 2, 1)
+ 
+    add_plot.hist(y, bins=50, color='dodgerblue', label='train', alpha=.6)
+    add_plot.hist(y_test, bins=50, color='indianred', label='test', alpha=.6)
+    add_plot.hist(y_dev, bins=50, color='darkorange', label='development', alpha=.6)
+
+    for tick in add_plot.xaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "RUL"
+    add_plot.set_xlabel(label, fontsize=10)
+
+    for tick in add_plot.yaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "#"
+    add_plot.set_ylabel(label, fontsize=10)
+    #title = "RUL score = %.2f" % score
+    #add_plot.set_title(title, fontsize=10)
+    add_plot.set_aspect(1./add_plot.get_data_ratio())
+    add_plot.legend(fontsize=8)
+    add_plot.grid(True)
+
+    yy = y[y<100]
+    yy_test = y_test[y_test<100]
+    yy_dev = y_dev[y_dev<100]
+
+    add_plot = fig.add_subplot(1, 2, 2)
+
+    add_plot.hist(yy, bins=50, color='dodgerblue', label='train', alpha=.6)
+    add_plot.hist(yy_test, bins=50, color='indianred', label='test', alpha=.6)
+    add_plot.hist(yy_dev, bins=50, color='darkorange', label='development', alpha=.6)
+   
+    for tick in add_plot.xaxis.get_major_ticks():
+      tick.label.set_fontsize(8)
+    label = "RUL"
+    add_plot.set_xlabel(label, fontsize=10)
+
+    for tick in add_plot.yaxis.get_major_ticks():
+      tick.label.set_fontsize(8)
+    label = "RUL test"
+    add_plot.set_ylabel(label, fontsize=10)
+    #title = "# late = %d" % q_late
+    #add_plot.set_title(title, fontsize=10)
+    add_plot.set_aspect(1./add_plot.get_data_ratio())
+    add_plot.legend(fontsize=8)
+    add_plot.grid(True)
+    
+    figname = FIG_DIR +name+".png"
+    print(figname)
+    fig.savefig(figname, format="png", dpi=300)
+
+    del fig
+
+
 
 
 class TestMetrics(TestCase):                                                                                                         
@@ -569,7 +630,22 @@ class TestMetrics(TestCase):
 
     #self.__metric.plot_loss_function()
     #self.__metric.plot_lin_loss_function()
-    self.__metric.plot_power_loss_function()
+    #self.__metric.plot_power_loss_function()
+
+    train_file = DATA_DIR+'train.txt'
+    test_file = DATA_DIR+'test.txt'
+    dev_file = DATA_DIR+'final_test.txt'
+    name = 'NASA_Challenge_RUL_distro'
+
+    reg = Regression(20, 100, 25)
+    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
+    #        reg.load_nasa_challenge_data(train_file, test_file)
+    (X_train, y_train, X_test, y_test, events_train, events_test, X_dev, y_dev) = \
+            reg.load_nasa_challenge_data(train_file, test_file, dev_file=dev_file)
+    del reg
+
+    self.__metric.plot_RUL_sample(y_train, y_test, y_dev, name=name)
+
     pass
 
 
