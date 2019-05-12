@@ -317,7 +317,8 @@ class Metrics:
 
     return s, s.sum()
 
-  def plot_RUL(self, y, y_hat, name='RNN_NASA_Challenge', a_1=13, a_2=10, a_1_loss=8, a_2_loss=5):
+  def plot_RUL(self, y, y_hat, a_1_pow=2, a_2_pow=3, a_1_lin=50, a_2_lin=100, \
+                    a_1=13, a_2=10, a_1_loss=8, a_2_loss=5, name='RNN_NASA_Challenge'):
 
     d = y_hat - y
     (s, score) = self.RUL_score(y, y_hat)
@@ -671,7 +672,6 @@ class TestMetrics(TestCase):
     dev_file = DATA_DIR+'final_test.txt'
     name = 'MLP_NASA_Challenge_RUL_sample_power_loss_a_2_4'
 
-    DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
     filename = DATA_DIR+'model/'+name+'_y_test.csv'
     df_test = pd.read_csv(filename)
 
@@ -681,7 +681,11 @@ class TestMetrics(TestCase):
     filename = DATA_DIR+'model/'+name+'_y_dev.csv'
     df_dev = pd.read_csv(filename)
 
-    self.__metric.plot_RUL_sample(y_train, y_test, y_dev, name=name)
+    print(self.__metric.RUL_score(df_train['y'], df_train['y_hat']))
+    print(self.__metric.RUL_score(df_test['y'], df_test['y_hat']))
+    print(self.__metric.RUL_score(df_dev['y'], df_dev['y_hat']))
+
+
 
     #reg = Regression(20, 100, 25)
     #(X_train, y_train, X_test, y_test, events_train, events_test) = \
