@@ -421,14 +421,14 @@ class TestRNN(TestCase):
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
 
-    name = 'RNN_NASA_Challenge_rul_power_loss_a_2_3'
+    name = 'RNN_NASA_Challenge_rul_power_loss_a_2_4'
 
     rnn = RNN(20, 100, 25, 75)
     (x_train, y_train, x_test, y_test, events_train, events_test) = \
             rnn.load_nasa_challenge_data(train_file, test_file)
-    rnn.fit(x_train, y_train, x_test, y_test, name=name, loss=rul_power_loss(a_1=2, a_2=3))
+    rnn.fit(x_train, y_train, x_test, y_test, name=name, loss=rul_power_loss(a_1=2, a_2=4))
     rnn.save(name=name)
-    rnn.test(x_test, y_test, name=name, loss=rul_power_loss(a_1=2, a_2=3))
+    rnn.test(x_test, y_test, name=name, loss=rul_power_loss(a_1=2, a_2=4))
     del rnn  
 
   def testERandom(self):
