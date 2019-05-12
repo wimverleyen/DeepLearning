@@ -348,12 +348,28 @@ class Metrics:
     ref_4 = np.linspace(0, 50, 100)
     lmax = np.expm1(ref_2/float(a_2_loss))
 
+    ref_5 = np.linspace(0, -50, 100)
+    llmin = -np.multiply(ref_5, a_1_lin)
+    ref_6 = np.linspace(0, 50, 100)
+    llmax = np.multiply(ref_6, a_2_lin)
+
+    ref_7 = np.linspace(0, -50, 100)
+    plmin = np.power(ref_7, a_1_pow)
+    ref_8 = np.linspace(0, 20, 40)
+    plmax = np.power(ref_8, a_2_pow)
+
     add_plot.plot(ref_1, dmin, color='indianred', linewidth=.75)
     add_plot.plot(ref_2, dmax, color='indianred', linewidth=.75, label='RUL score')
-    add_plot.scatter(d, s, color='dodgerblue', s=.75)
    
     add_plot.plot(ref_3, lmin, color='black', linewidth=.75, label='loss function')
     add_plot.plot(ref_4, lmax, color='black', linewidth=.75)
+
+    add_plot.plot(ref_5, llmin, color='dodgerblue', linewidth=.75, label='linear')
+    add_plot.plot(ref_6, llmax, color='dodgerblue', linewidth=.75)
+
+    add_plot.plot(ref_7, plmin, color='darkorange', linewidth=.75, label='power')
+    add_plot.plot(ref_8, plmax, color='darkorange', linewidth=.75)
+    add_plot.scatter(d, s, color='dodgerblue', s=.75)
 
     for tick in add_plot.xaxis.get_major_ticks():
       tick.label.set_fontsize(8) 
@@ -462,7 +478,6 @@ class Metrics:
 
     del fig
 
-
   def plot_RUL_sample(self, y, y_test, y_dev, name='NASA_Challenge_RUL_distro'):
 
     fig = plt.figure()
@@ -509,8 +524,6 @@ class Metrics:
       tick.label.set_fontsize(8)
     label = "RUL test"
     add_plot.set_ylabel(label, fontsize=10)
-    #title = "# late = %d" % q_late
-    #add_plot.set_title(title, fontsize=10)
     add_plot.set_aspect(1./add_plot.get_data_ratio())
     add_plot.legend(fontsize=8)
     add_plot.grid(True)
@@ -520,7 +533,6 @@ class Metrics:
     fig.savefig(figname, format="png", dpi=300)
 
     del fig
-
 
 
 
@@ -647,6 +659,41 @@ class TestMetrics(TestCase):
     self.__metric.plot_RUL_sample(y_train, y_test, y_dev, name=name)
 
     pass
+
+  def testDRULScore(self): 
+
+    #self.__metric.plot_loss_function()
+    #self.__metric.plot_lin_loss_function()
+    #self.__metric.plot_power_loss_function()
+
+    train_file = DATA_DIR+'train.txt'
+    test_file = DATA_DIR+'test.txt'
+    dev_file = DATA_DIR+'final_test.txt'
+    name = 'MLP_NASA_Challenge_RUL_sample_power_loss_a_2_4'
+
+    DATA_DIR = "/home/wimverleyen/data/aviation/NASA/Challenge_Data/"
+    filename = DATA_DIR+'model/'+name+'_y_test.csv'
+    df_test = pd.read_csv(filename)
+
+    filename = DATA_DIR+'model/'+name+'_y_train.csv'
+    df_train = pd.read_csv(filename)
+
+    filename = DATA_DIR+'model/'+name+'_y_dev.csv'
+    df_dev = pd.read_csv(filename)
+
+    self.__metric.plot_RUL_sample(y_train, y_test, y_dev, name=name)
+
+    #reg = Regression(20, 100, 25)
+    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
+    #        reg.load_nasa_challenge_data(train_file, test_file)
+    #(X_train, y_train, X_test, y_test, events_train, events_test, X_dev, y_dev) = \
+    #        reg.load_nasa_challenge_data(train_file, test_file, dev_file=dev_file)
+    #del reg
+
+    #self.__metric.plot_RUL_sample(y_train, y_test, y_dev, name=name)
+
+    pass
+
 
 
 def suite():
