@@ -315,7 +315,7 @@ class Metrics:
     ix = np.where(d >= 0)[0]
     s[ix] = dmax[ix]
 
-    return s, s.sum()
+    return s, s.sum()/float(d.shape[0])
 
   def plot_RUL(self, y, y_hat, a_1_pow=2, a_2_pow=3, a_1_lin=50, a_2_lin=100, \
                     a_1=13, a_2=10, a_1_loss=8, a_2_loss=5, name='RNN_NASA_Challenge'):
@@ -529,7 +529,120 @@ class Metrics:
     add_plot.legend(fontsize=8)
     add_plot.grid(True)
     
-    figname = FIG_DIR +name+".png"
+    figname = FIG_DIR+name+".png"
+    print(figname)
+    fig.savefig(figname, format="png", dpi=300)
+
+    del fig
+
+  def plot_lifetime(self, data, name='device_lifetime'):
+
+    fig = plt.figure()
+
+    fig.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, hspace=0.6, wspace=0.4)
+
+    add_plot = fig.add_subplot(1, 2, 1)
+
+    add_plot.scatter(data['y'].values, data['y_hat'].values, color='dodgerblue', s=.75)
+
+    #add_plot.hist(y, bins=50, color='dodgerblue', label='train', alpha=.6)
+    #add_plot.hist(y_test, bins=50, color='indianred', label='test', alpha=.6)
+    #add_plot.hist(y_dev, bins=50, color='darkorange', label='development', alpha=.6)
+
+    for tick in add_plot.xaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "RUL"
+    add_plot.set_xlabel(label, fontsize=10)
+
+    for tick in add_plot.yaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "RUL"
+    add_plot.set_ylabel(label, fontsize=10)
+    #title = "RUL score = %.2f" % score
+    #add_plot.set_title(title, fontsize=10)
+    add_plot.set_aspect(1./add_plot.get_data_ratio())
+    add_plot.legend(fontsize=8)
+    add_plot.grid(True)
+
+    figname = FIG_DIR+name+"_lifeime.png"
+    print(figname)
+    fig.savefig(figname, format="png", dpi=300)
+
+    del fig
+
+  def plot_pairplot_fleet(self, data, sensors, name='device_lifetime'):
+
+    sns_pair = sns.pairplot(data[sensors])
+    fig = sns_pair.get_figure()
+
+    figname = FIG_DIR+name+"_sensor_pair.png"
+    fig.savefig(figname, format="png", dpi=300)
+
+  def plot_degradation_fleet(self, df, sensor, name='device_lifetime'):
+
+    device_ids = df['device_id'].unique()
+
+    fig = plt.figure()
+
+    fig.subplots_adjust(left=0.125, right=0.9, bottom=0.1, top=0.9, hspace=0.6, wspace=0.4)
+
+    add_plot = fig.add_subplot(1, 2, 1)
+
+    for device_id in device_ids:
+
+      #add_plot.scatter(data['cycles'].values, data[sensor].values, color='dodgerblue', s=.75)
+      #add_plot.plot(df[df['device_id'] == device_id]['cycles'].values, \
+      #        df[df['device_id'] == device_id][sensor].values, color='dodgerblue', linewidth=.5)
+
+      add_plot.scatter(df[df['device_id'] == device_id]['cycles'].values, \
+              df[df['device_id'] == device_id][sensor].values, color='dodgerblue', s=.15, alpha=.7)
+      if device_id == 10:
+        add_plot.scatter(df[df['device_id'] == device_id]['cycles'].values, \
+              df[df['device_id'] == device_id][sensor].values, color='indianred', s=.5)
+
+    for tick in add_plot.xaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "cycles"
+    add_plot.set_xlabel(label, fontsize=10)
+
+    for tick in add_plot.yaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = sensor
+    add_plot.set_ylabel(label, fontsize=10)
+    #title = "RUL score = %.2f" % score
+    #add_plot.set_title(title, fontsize=10)
+    add_plot.set_aspect(1./add_plot.get_data_ratio())
+    add_plot.legend(fontsize=8)
+    add_plot.grid(True)
+
+    add_plot = fig.add_subplot(1, 2, 2)
+
+    for device_id in device_ids:
+
+      #add_plot.scatter(data['cycles'].values, data[sensor].values, color='dodgerblue', s=.75)
+      #add_plot.plot(df[df['device_id'] == device_id]['cycles'].values, \
+      #        df[df['device_id'] == device_id][sensor].values, color='dodgerblue', linewidth=.5)
+
+      #print(df[(df['device_id'] == device_id) and (df['cycles'] < 75)].values)
+      add_plot.scatter(df[df['device_id'] == device_id]['cycles'].values, \
+              df[df['device_id'] == device_id][sensor].values, color='dodgerblue', s=.5)
+
+    for tick in add_plot.xaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = "cycles"
+    add_plot.set_xlabel(label, fontsize=10)
+
+    for tick in add_plot.yaxis.get_major_ticks():
+      tick.label.set_fontsize(8) 
+    label = sensor
+    add_plot.set_ylabel(label, fontsize=10)
+    #title = "RUL score = %.2f" % score
+    #add_plot.set_title(title, fontsize=10)
+    add_plot.set_aspect(1./add_plot.get_data_ratio())
+    add_plot.legend(fontsize=8)
+    add_plot.grid(True)
+
+    figname = FIG_DIR+'fleet/'+name+'_'+sensor+"_fleet_degradation.png"
     print(figname)
     fig.savefig(figname, format="png", dpi=300)
 
@@ -685,8 +798,9 @@ class TestMetrics(TestCase):
     print(self.__metric.RUL_score(df_test['y'], df_test['y_hat']))
     print(self.__metric.RUL_score(df_dev['y'], df_dev['y_hat']))
 
-
-
+    y = np.asarray([1, 2, 3, 4, 5])
+    y_hat = np.asarray([2, 1, 2, 7, 5])
+    print(self.__metric.RUL_score(y, y_hat))
     #reg = Regression(20, 100, 25)
     #(X_train, y_train, X_test, y_test, events_train, events_test) = \
     #        reg.load_nasa_challenge_data(train_file, test_file)
@@ -698,6 +812,44 @@ class TestMetrics(TestCase):
 
     pass
 
+  def testEDevice(self):
+
+    device_id = 2
+
+    columns = ['device_id', 'cycles', 'setting1', 'setting2', 'setting3']
+    sensors = ['sensor'+str(i+1) for i in np.arange(0, 23)]
+    columns += sensors
+
+    test_file = DATA_DIR+'test.txt'
+    df = pd.read_csv(test_file, sep=' ', header=None)
+    df.columns = columns
+    print(df.head(n=5))
+
+    name = 'MLP_NASA_Challenge_RUL_sample_power_loss_a_2_4'
+
+    filename = DATA_DIR+'model/'+name+'_y_test.csv'
+    df_test = pd.read_csv(filename)
+
+    df['y_hat'] = df_test['y_hat'].values
+
+    data = df[df['device_id'] == device_id][['device_id', 'cycles', 'y_hat']]
+    
+    data['y'] = np.zeros(data.shape[0])
+    data['y'] = data['cycles'].max() - data['cycles']
+    print(data.head(n=5))
+    print(data.shape)
+
+    #self.__metric.plot_lifetime(data, name=name)
+
+    data = df[df['device_id'] == device_id][['device_id', 'cycles', 'y_hat']+sensors]
+    #data = df[df['device_id'] == device_id][['device_id', 'cycles', 'y_hat']+sensors]
+    #df_sensors = df[sensors]
+    for sensor in sensors:
+      #self.__metric.plot_degradation(data, name=name+'_sensor')
+      self.__metric.plot_degradation_fleet(df[['device_id', 'cycles', sensor]], sensor, name=name)
+    
+    #self.__metric.plot_pairplot_fleet(data, sensors, name=name)
+      
 
 
 def suite():

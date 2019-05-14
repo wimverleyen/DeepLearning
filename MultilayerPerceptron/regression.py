@@ -313,10 +313,11 @@ class Regression:
     scaler = MinMaxScaler(feature_range=(0, 1))
     X_train = scaler.fit_transform(df_train[parameters].values)
     y_train = np.asarray(df_train['RUL']).ravel()
-    X_test = scaler.fit_transform(df_test[parameters].values)
+    #X_test = scaler.fit_transform(df_test[parameters].values)
+    X_test = scaler.transform(df_test[parameters].values)
     y_test = np.asarray(df_test['RUL']).ravel()
     if len(dev_file) > 0:
-      X_dev = scaler.fit_transform(df_dev[parameters].values)
+      X_dev = scaler.transform(df_dev[parameters].values)
       y_dev = np.asarray(df_dev['RUL']).ravel()
 
     if len(dev_file) > 0:
@@ -378,7 +379,8 @@ class Regression:
     self.__model.compile(optimizer='rmsprop', loss=loss, metrics=['mae', 'acc'])
 
     self.__history = self.__model.fit_generator(RULGenerator(X, y), epochs=self.__epochs, \
-                            validation_data=(X_test, y_test))
+                            validation_data=(X_test, y_test), steps_per_epoch=500, max_queue_size=20,\
+                            workers=20, use_multiprocessing=True)
                             
     score = self.__model.evaluate(X_test, y_test, verbose=1)
     print("Model score: ", score)
@@ -489,12 +491,13 @@ class TestRegression(TestCase):
 
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
-    name = 'MLP_NASA_Challenge_RUL_lin_loss_a_50_600'
+    dev_file = DATA_DIR+'final_test.txt'
+    name = 'MLP_NASA_Challenge_RUL_sample_lin_loss_a_50_200'
 
     #reg = Regression(20, 100, 25)
-    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
-    #        reg.load_nasa_challenge_data(train_file, test_file)
-    #reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_lin_loss(a_1=50, a_2=600))
+    #(X, y, X_test, y_test, events_train, events_test, X_dev, y_dev) = \
+    #        reg.load_nasa_challenge_data(train_file, test_file, dev_file=dev_file)
+    #reg.fit_generator(X, y, X_test, y_test, events_test, name=name, loss=rul_lin_loss(a_1=50, a_2=200))
     #reg.save(name=name)
     #reg.test(X_test, y_test, name=name, loss=rul_lin_loss(a_1=50, a_2=600))
     #del reg
@@ -503,12 +506,14 @@ class TestRegression(TestCase):
 
     train_file = DATA_DIR+'train.txt'
     test_file = DATA_DIR+'test.txt'
+    dev_file = DATA_DIR+'final_test.txt'
     name = 'MLP_NASA_Challenge_RUL_power_loss_a_2_3'
 
     #reg = Regression(20, 100, 25)
-    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
-    #        reg.load_nasa_challenge_data(train_file, test_file)
+    #(X, y, X_test, y_test, events_train, events_test, X_dev, y_dev) = \
+    #        reg.load_nasa_challenge_data(train_file, test_file, dev_file=dev_file)
     #reg.fit(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_power_loss(a_1=2, a_2=3))
+    #reg.fit_generator(X, y, X_test, y_test, events_test, name=name, loss=rul_power_loss(a_1=2, a_2=5))
     #reg.save(name=name)
     #reg.test(X_test, y_test, name=name, loss=rul_power_loss(a_1=2, a_2=3))
     #del reg
@@ -521,14 +526,13 @@ class TestRegression(TestCase):
     name = 'MLP_NASA_Challenge_RUL_sample_power_loss_a_2_4'
 
     reg = Regression(20, 500, 25)
-    #(X_train, y_train, X_test, y_test, events_train, events_test) = \
-    #        reg.load_nasa_challenge_data(train_file, test_file)
-    (X_train, y_train, X_test, y_test, events_train, events_test, X_dev, y_dev) = \
+    (X, y, X_test, y_test, events_train, events_test, X_dev, y_dev) = \
             reg.load_nasa_challenge_data(train_file, test_file, dev_file=dev_file)
-    reg.fit_generator(X_train, y_train, X_test, y_test, events_test, name=name, loss=rul_power_loss(a_1=2, a_2=4))
+    reg.fit_generator(X, y, X_test, y_test, events_test, name=name, loss=rul_power_loss(a_1=2, a_2=4))
     reg.save(name=name)
     reg.test(X_test, y_test, name=name, loss=rul_power_loss(a_1=2, a_2=4))
     reg.test(X_dev, y_dev, name=name, loss=rul_power_loss(a_1=2, a_2=4), test='dev')
+    reg.test(X, y, name=name, loss=rul_power_loss(a_1=2, a_2=4), test='train')
     del reg
 
 
