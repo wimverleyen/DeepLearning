@@ -16,6 +16,54 @@ from keras.callbacks import ReduceLROnPlateau
 
 np.random.seed(813306)
 
+
+
+class ResNet:
+
+  def __init__(self, batch, epochs, inputDim):
+
+    self.__batch = batch
+    self.__epochs = epochs
+    self.__input_dim = inputDim
+
+    self.__model = None
+    self.__history = None
+
+  def __del__(self):
+
+    del self.__batch
+    del self.__epochs
+    del self.__input_dim
+    del self.__model
+    del self.__history
+
+  def build_model(self):
+
+    self.__model = Sequential()
+    #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='softmax'))
+    self.__model.add(Dense(12, kernel_initializer='normal', bias_initializer='zeros', \
+                            input_dim=self.__input_dim, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
+    self.__model.add(Dense(8, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
+    #self.__model.add(Dense(8, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
+    #self.__model.add(Dense(4, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
+    self.__model.add(Dense(4, activation='sigmoid'))
+    #self.__model.add(Dropout(.2))
+
+    #self.__model.add(Dense(1, activation='linear'))
+    self.__model.add(Dense(1, activation='exponential'))
+    #self.__model.add(Dense(1, activation='selu'))
+    #self.__model.add(Dense(1, activation='elu'))
+    #self.__model.add(Dense(1, input_dim=self.__input_dim, activation='linear'))
+    #self.__model.add(Dense(1, input_dim=self.__input_dim, activation='exponential'))
+    #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='exponential'))
+    #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='elu'))
+    #self.__model.add(Dense(self.__classes, input_dim=self.__input_dim, activation='selu'))
+
+
  
 def build_resnet(input_shape, n_feature_maps, nb_classes):
     print('build conv_x')
