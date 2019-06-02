@@ -181,6 +181,30 @@ class RNN:
     df_test.loc[df_test['rank'] <= train_gap, ['Y']] = 1
     df_test['RUL'] = np.zeros(df_test.shape[0])
 
+    train = []
+    for dev_id in df_train['device_id'].unique():
+      data = df_train[df_train['device_id'] == dev_id]
+      data['RUL'] = data['cycles'].max() - data['cycles']
+      train.append(data)
+    df_train = pd.concat(train, axis=0)
+
+    test = []
+    for dev_id in df_test['device_id'].unique():
+      data = df_test[df_test['device_id'] == dev_id]
+      data['RUL'] = data['cycles'].max() - data['cycles']
+      test.append(data)
+    df_test = pd.concat(test, axis=0)
+
+    """
+    if len(dev_file) > 0:
+      dev = []
+      for dev_id in df_dev['device_id'].unique():
+        data = df_dev[df_dev['device_id'] == dev_id]
+        data['RUL'] = data['cycles'].max() - data['cycles']
+        dev.append(data)
+      df_dev = pd.concat(dev, axis=0)
+
+
     for dev_id in df_train['device_id'].unique():
       df_train.loc[df_train['device_id'] == dev_id, ['RUL']] = \
             df_train['cycles'].max() - df_train['cycles']
@@ -188,6 +212,7 @@ class RNN:
     for dev_id in df_test['device_id'].unique():
       df_test.loc[df_test['device_id'] == dev_id, ['RUL']] = \
             df_test['cycles'].max() - df_test['cycles']
+    """
 
     parameters = ['cycles', 'setting1', 'setting2', 'setting3']
     #parameters = ['setting1', 'setting2', 'setting3']
