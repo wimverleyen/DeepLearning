@@ -107,6 +107,99 @@ class RNN:
     del self.__model
     del self.__history
 
+  def prepare_sequences(self, df):
+    '''
+    :param df:
+    :return: 3D X_seq with shape (sequences, window, parameters) for X_seq, and a 1D y_seq with shape (sequences,)
+    Steps:
+      1. convert dataframe into X and Y arrays
+      2. Transform X with scaler
+      3. generate look back sequences with window length
+    '''
+    X = df[self.__x_params]
+    X_scaled = pd.DataFrame(data=self.__scaler.transform(X), columns = self.__x_params)
+    y = df[self.__y_params]
+
+    # apply rolling window calculation if necessary
+    if self.__rolling_window > 0:
+      X_scaled = np.array(X_scaled.rolling(self.__rolling_window).mean().dropna())
+      y = np.array(y.rolling(self.__rolling_window).mean().dropna())
+
+    # generate sequences with window length
+    X_seq = []
+    y_seq = []
+    n_rows = X_scaled.shape[0]
+    for k in np.arange(n_rows - self.__window):
+      X_seq.append(X_scaled[k: k + self.__window, :])
+
+    for k in np.arange(n_rows - self.__window):
+      y_seq.append(y[k + self.__window])
+
+    X_seq = np.array(X_seq)
+    y_seq = np.array(y_seq)
+
+    return X_seq, y_seq
+
+  def load_nasa_data_alternative(self, train_file, test_file):
+    '''
+    :param train_file: train.txt file
+    :param test_file:  test.txt file
+    :return: training and testing sequencess for keras model training
+    '''
+    #initialize columns and read dfs
+    columns = ['device_id', 'cycles', 'setting1', 'setting2', 'setting3']
+    sensors = ['sensor' + str(i + 1) for i in np.arange(0, 23)]
+    columns += sensors
+
+    df_train = pd.read_csv(train_file, sep=' ', header=None)
+    df_train.columns = columns
+    df_train.dropna(axis=1, inplace=True)
+
+    df_test = pd.read_csv(test_file, sep=' ', header=None)
+    df_test.columns = columns
+    df_test.dropna(axis=1, inplace=True)
+
+    df_train.sort_values(by=['device_id','cycles'], ascending=True, inplace=True)
+    df_train.reset_index(inplace=True)
+
+    df_test.sort_values(by=['device_id','cycles'], ascending=True, inplace=True)
+    df_test.reset_index(inplace=True)
+
+    #generate event df and RUL/Y columns for train and test
+    df_train_events = df_train.groupby('device_id', as_index=False).agg({'cycles': 'max'})
+    df_train_events.columns = ['device_id', 'max_cycles']
+    df_train = df_train.merge(df_train_events,on='device_id')
+    df_train['RUL'] = df_train['max_cycles'] - df_train['cycles']
+    df_train['Y'] = np.where(df_train['RUL'] <= self.__train_gap, 1, 0)
+
+    df_test_events = df_test.groupby('device_id', as_index=False).agg({'cycles': 'max'})
+    df_test_events.columns = ['device_id', 'max_cycles']
+    df_test = df_test.merge(df_test_events,on='device_id')
+    df_test['RUL'] = df_test['max_cycles'] - df_test['cycles']
+    df_test['Y'] = np.where(df_test['RUL'] <= self.__train_gap, 1, 0)
+
+    #fit scaler on training set
+    self.__scaler.fit(df_train[self.__x_params].values)
+
+    #convert dataframe to sequences using prepare sequences function
+    train_seq = [self.prepare_sequences(df=df_train[df_train['device_id']==id]) for id in df_train['device_id'].unique()]
+    test_seq = [self.prepare_sequences(df=df_test[df_test['device_id']==id]) for id in df_test['device_id'].unique()]
+
+    #convert sequences to np arrays
+    X_train_seq = np.concatenate([tup[0] for tup in train_seq])
+    y_train_seq = np.concatenate([tup[1] for tup in train_seq])
+
+    X_test_seq = np.concatenate([tup[0] for tup in test_seq])
+    y_test_seq = np.concatenate([tup[1] for tup in test_seq])
+
+    #shuffle the training sequences if necessary
+    if self.__shuffle_train:
+      shuffle_index = np.random.permutation(X_train_seq.shape[0])
+      X_train_seq[shuffle_index]
+      y_train_seq[shuffle_index]
+
+    return X_train_seq, y_train_seq, X_test_seq, y_test_seq, df_train_events, df_test_events
+    
   def build_model_random(self):
 
     self.__model = Sequential()
